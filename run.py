@@ -7,8 +7,9 @@ import os
 import sys
 import subprocess
 from pathlib import Path
+from typing import Dict, Any
 
-def check_dependencies():
+def check_dependencies() -> bool:
     """Check if all required dependencies are installed"""
     try:
         import cv2
@@ -22,7 +23,7 @@ def check_dependencies():
         print("Please install dependencies with: pip install -r requirements.txt")
         return False
 
-def check_config():
+def check_config() -> bool:
     """Check if configuration has been updated"""
     try:
         from config import RTSP_CONFIG
@@ -37,7 +38,7 @@ def check_config():
             print(f"   - Password: {RTSP_CONFIG['password']}")
             print()
 
-            response = input("Continue anyway? (y/N): ").lower().strip()
+            response: str = input("Continue anyway? (y/N): ").lower().strip()
             if response != 'y':
                 return False
 
@@ -46,15 +47,15 @@ def check_config():
         print("❌ Cannot import config.py. Make sure the file exists.")
         return False
 
-def create_directories():
+def create_directories() -> None:
     """Create necessary directories"""
-    directories = ['recordings', 'templates']
+    directories: list[str] = ['recordings', 'templates']
 
     for directory in directories:
         Path(directory).mkdir(exist_ok=True)
         print(f"✅ Directory '{directory}' ready")
 
-def main():
+def main() -> None:
     """Main launcher function"""
     print("🎥 RTSP Camera Streaming Application")
     print("=" * 40)
@@ -89,7 +90,7 @@ def main():
         from app import app, socketio
         from config import get_app_config
 
-        config = get_app_config()
+        config: Dict[str, Any] = get_app_config()
         socketio.run(
             app,
             host=config['host'],

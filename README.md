@@ -40,39 +40,130 @@ The application provides a clean, modern web interface with:
 - Amcrest IP camera (or any RTSP-compatible camera)
 - Network connection to camera
 
-## Installation
+## Quick Start
 
-1. **Clone or download this project**
+### Option 1: Automated Setup (Recommended)
+
+1. **Clone the project**
    ```bash
    git clone <repository-url>
    cd rtsp-camera-streaming
    ```
 
-2. **Install dependencies**
+2. **Run the automated setup**
+   ```bash
+   python3 setup_env.py
+   ```
+   This will:
+   - Create a virtual environment
+   - Install all dependencies
+   - Set up development tools (optional)
+
+3. **Activate the virtual environment**
+   ```bash
+   # On macOS/Linux:
+   source activate.sh
+   # or
+   source venv/bin/activate
+
+   # On Windows:
+   activate.bat
+   # or
+   venv\Scripts\activate.bat
+   ```
+
+4. **Configure your camera** (edit `config.py`)
+   ```python
+   RTSP_CONFIG = {
+       'username': 'admin',
+       'password': 'your_camera_password',
+       'ip_address': '192.168.1.XXX',  # Your camera IP
+       'port': 554,
+       'channel': 1,
+       'subtype': 0,
+   }
+   ```
+
+5. **Run the application**
+   ```bash
+   python run.py
+   ```
+
+### Option 2: Manual Installation
+
+1. **Clone the project**
+   ```bash
+   git clone <repository-url>
+   cd rtsp-camera-streaming
+   ```
+
+2. **Create virtual environment (optional but recommended)**
+   ```bash
+   python3 -m venv venv
+
+   # Activate it:
+   # On macOS/Linux:
+   source venv/bin/activate
+   # On Windows:
+   venv\Scripts\activate.bat
+   ```
+
+3. **Install dependencies**
    ```bash
    pip install -r requirements.txt
    ```
 
-3. **Configure your camera settings**
-   Edit `config.py` and update the RTSP configuration:
+4. **Configure your camera** (edit `config.py`)
    ```python
    RTSP_CONFIG = {
-       'username': 'admin',           # Your camera username
-       'password': 'your_password',   # Your camera password
-       'ip_address': '192.168.1.100', # Your camera IP address
-       'port': 554,                   # RTSP port (usually 554)
-       'channel': 1,                  # Camera channel
-       'subtype': 0,                  # 0 = main stream, 1 = sub stream
+       'username': 'admin',
+       'password': 'your_camera_password',
+       'ip_address': '192.168.1.XXX',  # Your camera IP
+       'port': 554,
+       'channel': 1,
+       'subtype': 0,
    }
    ```
 
-4. **Run the application**
+5. **Run the application**
    ```bash
    python app.py
+   # or
+   python run.py
    ```
 
-5. **Access the web interface**
+6. **Access the web interface**
    Open your browser and go to: `http://localhost:5000`
+
+## Virtual Environment Benefits
+
+Using a virtual environment provides several advantages:
+- ✅ **Isolated dependencies** - No conflicts with system packages
+- ✅ **Easy cleanup** - Remove `venv/` folder to uninstall everything
+- ✅ **Reproducible setup** - Same environment across different machines
+- ✅ **Version control** - Pin exact dependency versions
+
+### Virtual Environment Commands
+
+```bash
+# Create virtual environment
+python3 -m venv venv
+
+# Activate (macOS/Linux)
+source venv/bin/activate
+
+# Activate (Windows)
+venv\Scripts\activate.bat
+
+# Deactivate (all platforms)
+deactivate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Install development tools
+pip install mypy==1.7.1
+```
 
 ## Configuration
 
@@ -135,6 +226,29 @@ The web interface provides real-time status information:
 - **Streaming**: Shows if video stream is active
 - **Recording**: Shows if currently recording
 
+## Development
+
+### Type Checking
+
+The project includes comprehensive type annotations. To run type checking:
+
+```bash
+# Install mypy (if not already installed)
+pip install mypy==1.7.1
+
+# Run type checking
+python check_types.py
+# or
+mypy app.py config.py run.py
+```
+
+### Project Scripts
+
+- `setup_env.py` - Automated virtual environment setup
+- `run.py` - Enhanced application launcher with environment detection
+- `check_types.py` - Type checking utility
+- `activate.sh` / `activate.bat` - Quick virtual environment activation
+
 ## Troubleshooting
 
 ### Common Issues
@@ -160,6 +274,11 @@ The web interface provides real-time status information:
 - Verify firewall settings allow access to port 5000
 - Try accessing via `http://localhost:5000` instead of the server IP
 
+**Virtual environment issues:**
+- Make sure you've activated the virtual environment
+- Try recreating it: `rm -rf venv && python3 setup_env.py`
+- Check Python version: `python --version` (should be 3.7+)
+
 ### Amcrest Camera Setup
 
 1. **Enable RTSP on your camera:**
@@ -182,13 +301,22 @@ The web interface provides real-time status information:
 
 ```
 rtsp-camera-streaming/
-├── app.py              # Main Flask application
-├── config.py           # Configuration settings
-├── requirements.txt    # Python dependencies
-├── README.md          # This file
+├── .git/                   # Git repository
+├── .gitignore             # Git ignore rules
+├── app.py                 # Main Flask application
+├── config.py              # Configuration settings
+├── requirements.txt       # Python dependencies
+├── setup_env.py           # Virtual environment setup
+├── run.py                 # Enhanced launcher
+├── check_types.py         # Type checking utility
+├── mypy.ini               # Type checking configuration
+├── activate.sh            # Virtual environment activation (Unix)
+├── activate.bat           # Virtual environment activation (Windows)
+├── README.md              # This file
 ├── templates/
-│   └── index.html     # Web interface template
-└── recordings/        # Recorded videos (created automatically)
+│   └── index.html         # Web interface template
+├── venv/                  # Virtual environment (created by setup)
+└── recordings/            # Recorded videos (created automatically)
 ```
 
 ## Technical Details
@@ -198,6 +326,7 @@ rtsp-camera-streaming/
 - **Frontend**: HTML5, CSS3, JavaScript, WebSockets
 - **Video Processing**: OpenCV (cv2)
 - **Real-time Communication**: Socket.IO
+- **Type Safety**: MyPy for static type checking
 
 ### Architecture
 1. **RTSP Stream Capture**: OpenCV captures frames from RTSP stream
@@ -228,3 +357,4 @@ For issues or questions:
 2. Verify your camera and network configuration
 3. Check application logs for error messages
 4. Ensure all dependencies are properly installed
+5. Make sure virtual environment is activated

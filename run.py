@@ -9,6 +9,43 @@ import subprocess
 from pathlib import Path
 from typing import Dict, Any
 
+def is_venv_active() -> bool:
+    """Check if virtual environment is currently active"""
+    return hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix)
+
+def venv_exists() -> bool:
+    """Check if virtual environment exists in project directory"""
+    return Path("venv").exists()
+
+def show_venv_instructions() -> None:
+    """Show virtual environment setup instructions"""
+    print("💡 Virtual Environment Recommendations:")
+    print("=" * 45)
+
+    if not venv_exists():
+        print("📋 No virtual environment found. To create one:")
+        print("   python3 setup_env.py")
+        print()
+    else:
+        if not is_venv_active():
+            print("📋 Virtual environment exists but is not activated.")
+            print("   To activate:")
+            if os.name == 'nt':  # Windows
+                print("   activate.bat")
+                print("   # or")
+                print("   venv\\Scripts\\activate.bat")
+            else:  # Unix-like (macOS, Linux)
+                print("   source activate.sh")
+                print("   # or")
+                print("   source venv/bin/activate")
+            print()
+
+    print("📦 Benefits of using virtual environment:")
+    print("   • Isolated dependencies")
+    print("   • No conflicts with system packages")
+    print("   • Easier deployment and sharing")
+    print("=" * 45)
+
 def check_dependencies() -> bool:
     """Check if all required dependencies are installed"""
     try:
@@ -21,6 +58,10 @@ def check_dependencies() -> bool:
     except ImportError as e:
         print(f"❌ Missing dependency: {e}")
         print("Please install dependencies with: pip install -r requirements.txt")
+
+        if venv_exists() and not is_venv_active():
+            print("\n💡 Tip: Activate your virtual environment first!")
+
         return False
 
 def check_config() -> bool:
@@ -67,8 +108,19 @@ def main() -> None:
 
     print(f"✅ Python {sys.version.split()[0]} detected")
 
+    # Show virtual environment status
+    if is_venv_active():
+        print(f"✅ Virtual environment active: {sys.prefix}")
+    else:
+        if venv_exists():
+            print("⚠️  Virtual environment available but not active")
+        else:
+            print("ℹ️  No virtual environment detected")
+
     # Check dependencies
     if not check_dependencies():
+        print()
+        show_venv_instructions()
         sys.exit(1)
     print("✅ All dependencies installed")
 

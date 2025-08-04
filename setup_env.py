@@ -44,6 +44,14 @@ def check_python_version() -> bool:
         print("❌ Python 3.7 or higher is required")
         print(f"   Current version: {sys.version}")
         return False
+
+    # Warning for very new Python versions
+    if sys.version_info >= (3, 13):
+        print(f"⚠️  You're using Python {sys.version_info.major}.{sys.version_info.minor}")
+        print("   This is a very new version. If you encounter package compatibility issues,")
+        print("   consider using Python 3.11 or 3.12 for better package support.")
+        print()
+
     return True
 
 def venv_exists() -> bool:
@@ -72,12 +80,14 @@ def install_dependencies() -> bool:
 
         print("📦 Installing dependencies...")
 
-        # Upgrade pip first
+        # Upgrade pip and setuptools first
+        print("   Upgrading pip and setuptools...")
         subprocess.run([
-            pip_executable, "install", "--upgrade", "pip"
+            pip_executable, "install", "--upgrade", "pip", "setuptools", "wheel"
         ], check=True, capture_output=True)
 
         # Install project dependencies
+        print("   Installing project dependencies...")
         result = subprocess.run([
             pip_executable, "install", "-r", "requirements.txt"
         ], check=True, capture_output=True, text=True)
@@ -89,6 +99,15 @@ def install_dependencies() -> bool:
         print(f"❌ Failed to install dependencies: {e}")
         if e.stderr:
             print(f"   Error: {e.stderr}")
+
+        # Provide helpful suggestions for common issues
+        if "setuptools.build_meta" in str(e.stderr) or "numpy" in str(e.stderr):
+            print("\n💡 Troubleshooting suggestions:")
+            print("   1. Try using Python 3.11 or 3.12 instead of a newer version")
+            print("   2. Make sure you have the latest pip: pip install --upgrade pip")
+            print("   3. For macOS with Apple Silicon, try: pip install --upgrade setuptools")
+            print("   4. If OpenCV fails, try: pip install opencv-python-headless instead")
+
         return False
 
 def install_dev_dependencies() -> bool:
@@ -98,7 +117,7 @@ def install_dev_dependencies() -> bool:
 
         print("🛠️  Installing development dependencies...")
         result = subprocess.run([
-            pip_executable, "install", "mypy==1.7.1"
+            pip_executable, "install", "mypy>=1.7.0,<2.0.0"
         ], check=True, capture_output=True, text=True)
 
         print("✅ Development dependencies installed successfully")
@@ -108,6 +127,7 @@ def install_dev_dependencies() -> bool:
         print(f"❌ Failed to install development dependencies: {e}")
         if e.stderr:
             print(f"   Error: {e.stderr}")
+        print("   Note: You can still use the application without development dependencies")
         return False
 
 def show_activation_instructions() -> None:
@@ -175,7 +195,15 @@ def main() -> None:
 
     # Install dependencies
     if not install_dependencies():
-        sys.exit(1)
+        print("\n⚠️  Dependency installation failed.")
+        print("   You can try installing dependencies manually:")
+        print("   1. Activate the virtual environment")
+        print("   2. Run: pip install --upgrade pip setuptools wheel")
+        print("   3. Run: pip install -r requirements.txt")
+
+        response = input("\nContinue with setup anyway? (y/N): ").lower().strip()
+        if response != 'y':
+            sys.exit(1)
 
     # Ask about development dependencies
     print()

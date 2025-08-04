@@ -19,7 +19,7 @@ RTSP_CONFIG: Dict[str, Any] = {
 # Application Settings
 APP_CONFIG: Dict[str, Any] = {
     'host': '0.0.0.0',
-    'port': 5000,
+    'port': 5005,
     'debug': True,
     'secret_key': 'change_this_secret_key_in_production',
 }

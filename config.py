@@ -1,11 +1,13 @@
 """
 Configuration settings for RTSP Camera Streaming Application (FFmpeg-based)
+
+For private/sensitive settings, create a config_private.py file (see config_private.py.example)
 """
 
 from typing import Dict, Any
 
-# RTSP Camera Configuration
-# Update these settings to match your Amcrest camera
+# RTSP Camera Configuration - DEFAULT VALUES
+# For actual credentials, create config_private.py (see config_private.py.example)
 RTSP_CONFIG: Dict[str, Any] = {
     # Basic connection settings
     'username': 'admin',           # Default Amcrest username
@@ -16,13 +18,23 @@ RTSP_CONFIG: Dict[str, Any] = {
     'subtype': 0,                  # 0 = main stream, 1 = sub stream
 }
 
-# Application Settings
+# Application Settings - DEFAULT VALUES
 APP_CONFIG: Dict[str, Any] = {
     'host': '0.0.0.0',
     'port': 5000,
     'debug': True,
     'secret_key': 'change_this_secret_key_in_production',
 }
+
+# Try to import private configuration and merge with defaults
+try:
+    from config_private import RTSP_CONFIG_PRIVATE, APP_CONFIG_PRIVATE
+    RTSP_CONFIG.update(RTSP_CONFIG_PRIVATE)
+    APP_CONFIG.update(APP_CONFIG_PRIVATE)
+    print("✅ Loaded private configuration from config_private.py")
+except ImportError:
+    print("ℹ️  No config_private.py found - using default configuration")
+    print("   To use private settings, copy config_private.py.example to config_private.py")
 
 # Video Recording Settings (FFmpeg-based)
 RECORDING_CONFIG: Dict[str, Any] = {
@@ -37,7 +49,7 @@ RECORDING_CONFIG: Dict[str, Any] = {
 
 # Streaming Settings (FFmpeg-based)
 STREAMING_CONFIG: Dict[str, Any] = {
-    'frame_rate': 1,               # Frames per second for web preview (1-5 recommended)
+    'frame_rate': 5,               # Frames per second for web preview (1-10 recommended)
     'reconnect_attempts': 3,       # Number of reconnection attempts
     'reconnect_delay': 5,          # Delay between reconnection attempts (seconds)
     'buffer_size': 10**8,          # FFmpeg buffer size for video data

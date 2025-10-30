@@ -1,0 +1,21 @@
+"""
+Private configuration settings - EXAMPLE/TEMPLATE
+Copy this file to config_private.py and update with your actual credentials
+"""
+
+from typing import Dict, Any
+
+# Your actual camera credentials
+RTSP_CONFIG_PRIVATE: Dict[str, Any] = {
+    'username': 'admin',
+    'password': 'your_camera_password',
+    'ip_address': '192.168.1.XXX',
+    'port': 554,
+}
+
+# Any other private settings you want to override
+APP_CONFIG_PRIVATE: Dict[str, Any] = {
+    # 'secret_key': 'your-production-secret-key-here',
+    # 'debug': False,
+    # 'port': 5005,
+}

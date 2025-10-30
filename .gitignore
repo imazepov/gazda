@@ -139,6 +139,7 @@ recordings/
 # Configuration files with sensitive data
 config_local.py
 config_production.py
+config_private.py
 
 # IDE files
 .vscode/

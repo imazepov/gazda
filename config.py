@@ -1,5 +1,5 @@
 """
-Configuration settings for RTSP Camera Streaming Application
+Configuration settings for RTSP Camera Streaming Application (FFmpeg-based)
 """
 
 from typing import Dict, Any
@@ -9,8 +9,8 @@ from typing import Dict, Any
 RTSP_CONFIG: Dict[str, Any] = {
     # Basic connection settings
     'username': 'admin',           # Default Amcrest username
-    'password': 'mazepovs1523',        # Change this to your camera password
-    'ip_address': '192.168.86.87', # Change this to your camera's IP address
+    'password': 'password',        # Change this to your camera password
+    'ip_address': '192.168.1.100', # Change this to your camera's IP address
     'port': 554,                   # Default RTSP port
     'channel': 1,                  # Camera channel (usually 1)
     'subtype': 0,                  # 0 = main stream, 1 = sub stream
@@ -19,25 +19,29 @@ RTSP_CONFIG: Dict[str, Any] = {
 # Application Settings
 APP_CONFIG: Dict[str, Any] = {
     'host': '0.0.0.0',
-    'port': 5005,
+    'port': 5000,
     'debug': True,
     'secret_key': 'change_this_secret_key_in_production',
 }
 
-# Video Recording Settings
+# Video Recording Settings (FFmpeg-based)
 RECORDING_CONFIG: Dict[str, Any] = {
     'output_directory': 'recordings',
-    'video_codec': 'mp4v',         # Video codec for recording
+    'video_codec': 'libx264',      # FFmpeg video codec for recording
+    'audio_codec': 'aac',          # FFmpeg audio codec for recording
+    'preset': 'fast',              # FFmpeg encoding preset (fast, medium, slow)
+    'crf': 23,                     # Constant Rate Factor (18-28, lower = better quality)
     'default_fps': 30,             # Default FPS if not detected from stream
-    'jpeg_quality': 80,            # JPEG compression quality for web streaming (1-100)
+    'jpeg_quality': 80,            # JPEG quality for web streaming (1-100)
 }
 
-# Streaming Settings
+# Streaming Settings (FFmpeg-based)
 STREAMING_CONFIG: Dict[str, Any] = {
-    'buffer_size': 1,              # OpenCV buffer size (lower = less latency)
-    'frame_rate': 30,              # Target frame rate for web streaming
+    'frame_rate': 1,               # Frames per second for web preview (1-5 recommended)
     'reconnect_attempts': 3,       # Number of reconnection attempts
     'reconnect_delay': 5,          # Delay between reconnection attempts (seconds)
+    'buffer_size': 10**8,          # FFmpeg buffer size for video data
+    'ffmpeg_timeout': 30,          # FFmpeg connection timeout in seconds
 }
 
 def get_rtsp_url() -> str:

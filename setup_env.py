@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Virtual Environment Setup Script for RTSP Camera Streaming Application
+Virtual Environment Setup Script for RTSP Camera Streaming Application (FFmpeg-based)
 """
 
 import os
@@ -37,6 +37,14 @@ def get_pip_executable() -> str:
         return str(venv_path / "Scripts" / "pip.exe")
     else:
         return str(venv_path / "bin" / "pip")
+
+def check_ffmpeg_installed() -> bool:
+    """Check if FFmpeg is installed on the system"""
+    try:
+        subprocess.run(['ffmpeg', '-version'], capture_output=True, check=True)
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
 
 def check_python_version() -> bool:
     """Check if Python version is 3.7 or higher"""
@@ -130,6 +138,42 @@ def install_dev_dependencies() -> bool:
         print("   Note: You can still use the application without development dependencies")
         return False
 
+def show_ffmpeg_instructions() -> None:
+    """Show FFmpeg installation instructions"""
+    system = platform.system()
+
+    print("\n📹 FFmpeg Installation Required")
+    print("=" * 40)
+    print("This application uses FFmpeg for video processing.")
+    print("Please install FFmpeg on your system:")
+    print()
+
+    if system == "Darwin":  # macOS
+        print("macOS (using Homebrew):")
+        print("   brew install ffmpeg")
+        print()
+        print("Or download from: https://ffmpeg.org/download.html")
+    elif system == "Linux":
+        print("Ubuntu/Debian:")
+        print("   sudo apt update")
+        print("   sudo apt install ffmpeg")
+        print()
+        print("CentOS/RHEL:")
+        print("   sudo yum install ffmpeg")
+        print()
+        print("Or download from: https://ffmpeg.org/download.html")
+    elif system == "Windows":
+        print("Windows:")
+        print("   1. Download from: https://ffmpeg.org/download.html")
+        print("   2. Extract to a folder (e.g., C:\\ffmpeg)")
+        print("   3. Add the bin folder to your PATH environment variable")
+        print("   4. Restart your terminal/command prompt")
+    else:
+        print("Please visit: https://ffmpeg.org/download.html")
+
+    print("\nAfter installation, verify with: ffmpeg -version")
+    print("=" * 40)
+
 def show_activation_instructions() -> None:
     """Show instructions for activating the virtual environment"""
     activation_script = get_activation_script()
@@ -163,14 +207,24 @@ def show_activation_instructions() -> None:
 
 def main() -> None:
     """Main setup function"""
-    print("🎥 RTSP Camera Streaming - Virtual Environment Setup")
-    print("=" * 55)
+    print("🎥 RTSP Camera Streaming - Virtual Environment Setup (FFmpeg)")
+    print("=" * 65)
 
     # Check Python version
     if not check_python_version():
         sys.exit(1)
 
     print(f"✅ Python {sys.version.split()[0]} detected")
+
+    # Check FFmpeg installation
+    if not check_ffmpeg_installed():
+        print("❌ FFmpeg is not installed")
+        show_ffmpeg_instructions()
+        response = input("\nContinue with setup anyway? (y/N): ").lower().strip()
+        if response != 'y':
+            sys.exit(1)
+    else:
+        print("✅ FFmpeg is installed")
 
     # Check if requirements.txt exists
     if not Path("requirements.txt").exists():

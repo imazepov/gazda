@@ -1,17 +1,19 @@
-# RTSP Camera Streaming Application
+# RTSP Camera Streaming Application (FFmpeg-based)
 
-A Python-based web application for streaming video from RTSP cameras (specifically optimized for Amcrest cameras) with real-time web viewing and video recording capabilities.
+A Python-based web application for streaming video from RTSP cameras (specifically optimized for Amcrest cameras) with real-time web viewing and video recording capabilities using FFmpeg for robust video processing.
 
 ## Features
 
 ✨ **Real-time Video Streaming**
 - Live RTSP stream viewing in web browser
 - WebSocket-based real-time frame transmission
+- FFmpeg-powered video processing for better reliability
 - Automatic reconnection on connection loss
 
 🎥 **Video Recording**
-- Record video streams to disk
-- Timestamped MP4 files
+- Record video streams to disk using FFmpeg
+- High-quality MP4 files with H.264 encoding
+- Timestamped recordings with configurable quality settings
 - Start/stop recording on demand
 
 🌐 **Modern Web Interface**
@@ -24,6 +26,7 @@ A Python-based web application for streaming video from RTSP cameras (specifical
 - Easy configuration through `config.py`
 - Support for different camera settings
 - Adjustable video quality and streaming parameters
+- FFmpeg-specific configuration options
 
 ## Screenshots
 
@@ -37,6 +40,7 @@ The application provides a clean, modern web interface with:
 ## Requirements
 
 - Python 3.7+
+- FFmpeg (system installation required)
 - Amcrest IP camera (or any RTSP-compatible camera)
 - Network connection to camera
 
@@ -44,22 +48,34 @@ The application provides a clean, modern web interface with:
 
 ### Option 1: Automated Setup (Recommended)
 
-1. **Clone the project**
+1. **Install FFmpeg** (required first):
+   ```bash
+   # macOS:
+   brew install ffmpeg
+
+   # Ubuntu/Debian:
+   sudo apt update && sudo apt install ffmpeg
+
+   # Windows: Download from https://ffmpeg.org/download.html
+   ```
+
+2. **Clone the project**
    ```bash
    git clone <repository-url>
    cd rtsp-camera-streaming
    ```
 
-2. **Run the automated setup**
+3. **Run the automated setup**
    ```bash
    python3 setup_env.py
    ```
    This will:
+   - Check FFmpeg installation
    - Create a virtual environment
    - Install all dependencies
    - Set up development tools (optional)
 
-3. **Activate the virtual environment**
+4. **Activate the virtual environment**
    ```bash
    # On macOS/Linux:
    source activate.sh
@@ -72,7 +88,7 @@ The application provides a clean, modern web interface with:
    venv\Scripts\activate.bat
    ```
 
-4. **Configure your camera** (edit `config.py`)
+5. **Configure your camera** (edit `config.py`)
    ```python
    RTSP_CONFIG = {
        'username': 'admin',
@@ -84,20 +100,22 @@ The application provides a clean, modern web interface with:
    }
    ```
 
-5. **Run the application**
+6. **Run the application**
    ```bash
    python run.py
    ```
 
 ### Option 2: Manual Installation
 
-1. **Clone the project**
+1. **Install FFmpeg** (see instructions above)
+
+2. **Clone the project**
    ```bash
    git clone <repository-url>
    cd rtsp-camera-streaming
    ```
 
-2. **Create virtual environment (optional but recommended)**
+3. **Create virtual environment (optional but recommended)**
    ```bash
    python3 -m venv venv
 
@@ -108,12 +126,12 @@ The application provides a clean, modern web interface with:
    venv\Scripts\activate.bat
    ```
 
-3. **Install dependencies**
+4. **Install dependencies**
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Configure your camera** (edit `config.py`)
+5. **Configure your camera** (edit `config.py`)
    ```python
    RTSP_CONFIG = {
        'username': 'admin',
@@ -125,15 +143,44 @@ The application provides a clean, modern web interface with:
    }
    ```
 
-5. **Run the application**
+6. **Run the application**
    ```bash
    python app.py
    # or
    python run.py
    ```
 
-6. **Access the web interface**
+7. **Access the web interface**
    Open your browser and go to: `http://localhost:5000`
+
+## FFmpeg Installation
+
+### macOS
+```bash
+brew install ffmpeg
+```
+
+### Ubuntu/Debian
+```bash
+sudo apt update
+sudo apt install ffmpeg
+```
+
+### CentOS/RHEL
+```bash
+sudo yum install ffmpeg
+```
+
+### Windows
+1. Download from: https://ffmpeg.org/download.html
+2. Extract to a folder (e.g., `C:\ffmpeg`)
+3. Add the `bin` folder to your PATH environment variable
+4. Restart your terminal/command prompt
+
+### Verify Installation
+```bash
+ffmpeg -version
+```
 
 ## Virtual Environment Benefits
 
@@ -162,7 +209,7 @@ deactivate
 pip install -r requirements.txt
 
 # Install development tools
-pip install mypy==1.7.1
+pip install mypy>=1.7.0,<2.0.0
 ```
 
 ## Configuration
@@ -191,14 +238,29 @@ APP_CONFIG = {
 }
 ```
 
-### Recording Settings
+### Recording Settings (FFmpeg-based)
 
 ```python
 RECORDING_CONFIG = {
     'output_directory': 'recordings',  # Where to save recorded videos
-    'video_codec': 'mp4v',            # Video codec for recording
+    'video_codec': 'libx264',         # FFmpeg video codec for recording
+    'audio_codec': 'aac',             # FFmpeg audio codec for recording
+    'preset': 'fast',                  # FFmpeg encoding preset (fast, medium, slow)
+    'crf': 23,                        # Constant Rate Factor (18-28, lower = better quality)
     'default_fps': 30,                # Default FPS if not detected
     'jpeg_quality': 80,               # JPEG quality for web streaming (1-100)
+}
+```
+
+### Streaming Settings (FFmpeg-based)
+
+```python
+STREAMING_CONFIG = {
+    'frame_rate': 1,                  # Frames per second for web preview (1-5 recommended)
+    'reconnect_attempts': 3,          # Number of reconnection attempts
+    'reconnect_delay': 5,             # Delay between reconnection attempts (seconds)
+    'buffer_size': 10**8,             # FFmpeg buffer size for video data
+    'ffmpeg_timeout': 30,             # FFmpeg connection timeout in seconds
 }
 ```
 
@@ -207,7 +269,7 @@ RECORDING_CONFIG = {
 ### Starting a Stream
 
 1. Click the **"Start Stream"** button in the web interface
-2. The application will connect to your RTSP camera
+2. The application will connect to your RTSP camera using FFmpeg
 3. Live video will appear in the web interface
 4. Status indicators will show connection status
 
@@ -215,7 +277,7 @@ RECORDING_CONFIG = {
 
 1. Ensure the stream is active
 2. Click **"Start Recording"** to begin recording
-3. Video will be saved to the `recordings/` directory
+3. Video will be saved to the `recordings/` directory using FFmpeg
 4. Click **"Stop Recording"** when finished
 5. Files are saved with timestamps: `recording_YYYYMMDD_HHMMSS.mp4`
 
@@ -234,7 +296,7 @@ The project includes comprehensive type annotations. To run type checking:
 
 ```bash
 # Install mypy (if not already installed)
-pip install mypy==1.7.1
+pip install mypy>=1.7.0,<2.0.0
 
 # Run type checking
 python check_types.py
@@ -244,10 +306,26 @@ mypy app.py config.py run.py
 
 ### Project Scripts
 
-- `setup_env.py` - Automated virtual environment setup
+- `setup_env.py` - Automated virtual environment setup with FFmpeg check
 - `run.py` - Enhanced application launcher with environment detection
 - `check_types.py` - Type checking utility
 - `activate.sh` / `activate.bat` - Quick virtual environment activation
+
+## FFmpeg vs OpenCV Benefits
+
+### Why FFmpeg?
+- ✅ **Better RTSP handling** - More robust connection management
+- ✅ **Hardware acceleration** - Can use GPU encoding/decoding
+- ✅ **More codec support** - Extensive format and codec support
+- ✅ **Better performance** - Optimized for video processing
+- ✅ **Industry standard** - Widely used in professional applications
+- ✅ **Lower latency** - Better real-time performance
+
+### Performance Improvements
+- **Reduced CPU usage** - Hardware acceleration when available
+- **Better quality** - More encoding options and quality settings
+- **Faster startup** - More efficient stream initialization
+- **Stable connections** - Better handling of network issues
 
 ## Troubleshooting
 
@@ -259,15 +337,20 @@ mypy app.py config.py run.py
 - Check that RTSP is enabled on your camera
 - Try accessing the camera's web interface to verify it's working
 
+**FFmpeg not found:**
+- Install FFmpeg using the instructions above
+- Verify installation with: `ffmpeg -version`
+- Make sure FFmpeg is in your system PATH
+
 **Poor video quality:**
-- Adjust `jpeg_quality` in `config.py` (higher = better quality, more bandwidth)
+- Adjust `crf` value in `config.py` (lower = better quality)
 - Check your network connection speed
 - Consider using the sub-stream (`subtype = 1`) for lower bandwidth
 
 **Recording issues:**
 - Ensure the `recordings/` directory is writable
 - Check available disk space
-- Verify video codec support on your system
+- Verify FFmpeg installation and codec support
 
 **Web interface not loading:**
 - Check that Flask server is running on the correct port
@@ -303,7 +386,7 @@ mypy app.py config.py run.py
 rtsp-camera-streaming/
 ├── .git/                   # Git repository
 ├── .gitignore             # Git ignore rules
-├── app.py                 # Main Flask application
+├── app.py                 # Main Flask application (FFmpeg-based)
 ├── config.py              # Configuration settings
 ├── requirements.txt       # Python dependencies
 ├── setup_env.py           # Virtual environment setup
@@ -324,15 +407,15 @@ rtsp-camera-streaming/
 ### Technology Stack
 - **Backend**: Python Flask + Flask-SocketIO
 - **Frontend**: HTML5, CSS3, JavaScript, WebSockets
-- **Video Processing**: OpenCV (cv2)
+- **Video Processing**: FFmpeg (replacing OpenCV)
 - **Real-time Communication**: Socket.IO
 - **Type Safety**: MyPy for static type checking
 
 ### Architecture
-1. **RTSP Stream Capture**: OpenCV captures frames from RTSP stream
-2. **Frame Processing**: Frames are encoded as JPEG for web transmission
+1. **RTSP Stream Capture**: FFmpeg captures frames from RTSP stream
+2. **Frame Processing**: Frames are processed and encoded as JPEG for web transmission
 3. **WebSocket Streaming**: Real-time frame transmission to web clients
-4. **Video Recording**: Simultaneous recording to MP4 files
+4. **Video Recording**: Simultaneous recording to MP4 files using FFmpeg
 5. **Web Interface**: Modern responsive UI for control and monitoring
 
 ## Security Considerations
@@ -358,3 +441,4 @@ For issues or questions:
 3. Check application logs for error messages
 4. Ensure all dependencies are properly installed
 5. Make sure virtual environment is activated
+6. Verify FFmpeg installation

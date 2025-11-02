@@ -49,7 +49,7 @@ def require_authentication() -> Optional[Response]:
     # Check authentication
     auth_result = auth.current_user()
     if auth_result is None:
-        return auth.auth_error_callback()
+        return auth.auth_error_callback(401)
 
 class RTSPStreamer:
     def __init__(self, rtsp_url: str, recording_config: Optional[Dict[str, Any]] = None, streaming_config: Optional[Dict[str, Any]] = None) -> None:

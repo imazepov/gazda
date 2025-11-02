@@ -139,8 +139,11 @@ def main() -> None:
 
     try:
         # Import and run the main application
-        from app import app, socketio
+        from app import app, socketio, start_auto_streaming
         from config import get_app_config
+
+        # Start auto-streaming
+        start_auto_streaming()
 
         config: Dict[str, Any] = get_app_config()
         socketio.run(
@@ -151,10 +154,15 @@ def main() -> None:
         )
 
     except KeyboardInterrupt:
-        print("\n👋 Server stopped by user")
+        print("\n⏸️  Interrupted by user")
+        # Cleanup is handled by app.py's signal handlers
     except Exception as e:
         print(f"\n❌ Error starting server: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
+    finally:
+        print("👋 Server stopped")
 
 if __name__ == '__main__':
     main()

@@ -19,7 +19,7 @@ from typing import Dict, Any, Optional, Iterator, Tuple, Union
 app: Flask = Flask(__name__)
 app_config: Dict[str, Any] = get_app_config()
 app.config['SECRET_KEY'] = app_config['secret_key']
-socketio: SocketIO = SocketIO(app, cors_allowed_origins="*")
+socketio: SocketIO = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 class RTSPStreamer:
     def __init__(self, rtsp_url: str, recording_config: Optional[Dict[str, Any]] = None, streaming_config: Optional[Dict[str, Any]] = None) -> None:
@@ -102,21 +102,19 @@ class RTSPStreamer:
         try:
             # Create temporary directory for frames
             self.temp_dir = tempfile.mkdtemp(prefix="rtsp_frames_")
-            print(f"📁 Using temp directory: {self.temp_dir}")
 
-            # Simpler FFmpeg command - just extract frames without complex filtering
+            # Extract frames at the configured frame rate
+            fps = self.streaming_config['frame_rate']
             frame_pattern = os.path.join(self.temp_dir, "frame_%04d.jpg")
             cmd = [
                 'ffmpeg',
                 '-rtsp_transport', 'tcp',  # Use TCP instead of UDP for more reliable connection
                 '-i', self.rtsp_url,
                 '-f', 'image2',
-                '-vf', 'fps=1',  # Extract 1 frame per second (simpler)
+                '-vf', f'fps={fps}',  # Extract frames at configured FPS
                 '-y',  # Overwrite output files
                 frame_pattern
             ]
-
-            print(f"🔧 FFmpeg command: {' '.join(cmd)}")
 
             self.ffmpeg_process = subprocess.Popen(
                 cmd,
@@ -135,7 +133,7 @@ class RTSPStreamer:
             print("✅ FFmpeg process started successfully")
 
         except Exception as e:
-            print(f"❌ Failed to start FFmpeg process: {e}")
+            print(f"Failed to start FFmpeg process: {e}")
 
     def _monitor_stderr(self) -> None:
         """Monitor FFmpeg stderr for errors and info"""
@@ -144,7 +142,8 @@ class RTSPStreamer:
                 line = self.ffmpeg_process.stderr.readline()
                 if line:
                     line_str = line.decode('utf-8', errors='ignore').strip()
-                    if line_str and not line_str.startswith('frame='):
+                    # Only log errors and warnings, skip normal status messages
+                    if line_str and ('error' in line_str.lower() or 'warning' in line_str.lower()):
                         print(f"🔍 FFmpeg: {line_str}")
             except Exception as e:
                 print(f"Error reading stderr: {e}")
@@ -154,8 +153,6 @@ class RTSPStreamer:
         """Read frames from temporary files created by FFmpeg"""
         frame_count = 0
         last_frame_number = 0
-
-        print("👀 Starting frame monitoring...")
 
         while self.streaming and self.ffmpeg_process and self.ffmpeg_process.poll() is None:
             try:
@@ -171,6 +168,9 @@ class RTSPStreamer:
                     frame_number = int(latest_frame.split("_")[-1].split(".")[0])
 
                     if frame_number > last_frame_number:
+                        # Wait a moment to ensure file is fully written
+                        time.sleep(0.1)
+
                         # Read the frame file
                         with open(latest_frame, 'rb') as f:
                             frame_data = f.read()
@@ -182,9 +182,6 @@ class RTSPStreamer:
                                 self.frame_ready.set()
                                 self.last_frame_time = time.time()
 
-                            if frame_count % 10 == 0:  # Log every 10th frame
-                                print(f"📸 Read frame {frame_count}, size: {len(frame_data)} bytes")
-
                             last_frame_number = frame_number
 
                             # Clean up old frame files (keep only the latest 5)
@@ -194,16 +191,6 @@ class RTSPStreamer:
                                         os.remove(old_file)
                                     except:
                                         pass
-                else:
-                    # Log when no frame files are found
-                    if frame_count == 0:
-                        print(f"🔍 No frame files found in {self.temp_dir}")
-                        # List contents of temp directory
-                        try:
-                            temp_contents = os.listdir(self.temp_dir)
-                            print(f"📁 Temp directory contents: {temp_contents}")
-                        except Exception as e:
-                            print(f"Error listing temp directory: {e}")
 
                 time.sleep(0.2)  # Check for new frames every 200ms
 
@@ -212,60 +199,154 @@ class RTSPStreamer:
                 time.sleep(0.1)
 
     def start_recording(self) -> bool:
-        """Start recording video using FFmpeg"""
+        """Start continuous recording with automatic file rotation"""
         if not self.streaming:
             return False
 
+        self.recording = True
+        # Start recording loop in background thread
+        self.recording_thread = threading.Thread(target=self._recording_loop, daemon=True)
+        self.recording_thread.start()
+        return True
+
+    def _recording_loop(self) -> None:
+        """Continuous recording loop with file rotation based on size"""
+        MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB in bytes
+
+        while self.recording and self.streaming:
+            try:
+                # Create output filename with timestamp
+                timestamp: str = datetime.now().strftime("%Y%m%d_%H%M%S")
+                output_path: str = os.path.join(self.output_dir, f"recording_{timestamp}.mp4")
+
+                # Build FFmpeg command with compression settings
+                cmd = [
+                    'ffmpeg',
+                    '-rtsp_transport', 'tcp',
+                    '-i', self.rtsp_url,
+                ]
+
+                # Video encoding settings
+                cmd.extend([
+                    '-c:v', self.recording_config['video_codec'],
+                    '-preset', self.recording_config['preset'],
+                    '-crf', str(self.recording_config['crf']),
+                ])
+
+                # Add resolution scaling if configured
+                if self.recording_config.get('resolution'):
+                    cmd.extend(['-vf', f"scale={self.recording_config['resolution']}"])
+
+                # Audio encoding
+                cmd.extend([
+                    '-c:a', self.recording_config['audio_codec'],
+                    '-f', 'mp4',
+                    '-movflags', '+faststart',
+                    '-y',
+                    output_path
+                ])
+
+                print(f"🎥 Started recording: {output_path}")
+
+                self.recording_process = subprocess.Popen(
+                    cmd,
+                    stdin=subprocess.PIPE,  # Allow sending 'q' to gracefully stop
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+
+                # Monitor the recording process and file size
+                start_time = time.time()
+                while self.recording and self.streaming:
+                    if self.recording_process.poll() is not None:
+                        # Process ended unexpectedly - log error
+                        stderr_output = self.recording_process.stderr.read().decode('utf-8', errors='ignore')
+                        print(f"❌ Recording process ended unexpectedly")
+                        if stderr_output:
+                            # Only show last few lines of error
+                            error_lines = stderr_output.strip().split('\n')
+                            for line in error_lines[-5:]:
+                                if 'error' in line.lower() or 'invalid' in line.lower():
+                                    print(f"   FFmpeg error: {line}")
+                        print("📹 Restarting recording in 5 seconds...")
+                        time.sleep(5)
+                        break
+
+                    # Check file size every 10 seconds
+                    if os.path.exists(output_path):
+                        file_size = os.path.getsize(output_path)
+                        if file_size >= MAX_FILE_SIZE:
+                            print(f"📏 File reached {file_size / (1024*1024):.1f}MB, rotating...")
+                            # Gracefully stop this recording to start a new file
+                            self._stop_recording_gracefully()
+                            break
+
+                    time.sleep(10)
+
+                # Clean up this recording process if still running
+                if self.recording_process and self.recording_process.poll() is None:
+                    self._stop_recording_gracefully()
+
+            except Exception as e:
+                print(f"❌ Error in recording loop: {e}")
+                import traceback
+                traceback.print_exc()
+                time.sleep(5)  # Wait before retrying
+
+    def _stop_recording_gracefully(self) -> None:
+        """Gracefully stop FFmpeg recording process to ensure file is properly finalized"""
+        if not self.recording_process or self.recording_process.poll() is not None:
+            return
+
         try:
-            # Create output filename with timestamp
-            timestamp: str = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_path: str = os.path.join(self.output_dir, f"recording_{timestamp}.mp4")
+            # Method 1: Send 'q' to FFmpeg stdin to trigger graceful shutdown
+            # This tells FFmpeg to finish writing and close the file properly
+            print("📝 Finalizing recording file...")
+            self.recording_process.stdin.write(b'q')
+            self.recording_process.stdin.flush()
 
-            # FFmpeg command for recording
-            cmd = [
-                'ffmpeg',
-                '-i', self.rtsp_url,
-                '-c:v', 'libx264',
-                '-preset', 'fast',
-                '-crf', '23',  # Good quality
-                '-c:a', 'aac',
-                '-f', 'mp4',
-                '-y',  # Overwrite output file
-                output_path
-            ]
-
-            self.recording_process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-
-            self.recording = True
-            print(f"🎥 Started recording to: {output_path}")
-            return True
+            # Wait up to 10 seconds for graceful shutdown
+            try:
+                self.recording_process.wait(timeout=10)
+                print("✅ Recording file finalized successfully")
+            except subprocess.TimeoutExpired:
+                print("⚠️  FFmpeg didn't stop gracefully, sending SIGTERM...")
+                # Method 2: Send SIGTERM (still allows FFmpeg to finish writing)
+                self.recording_process.terminate()
+                try:
+                    self.recording_process.wait(timeout=5)
+                    print("✅ Recording stopped with SIGTERM")
+                except subprocess.TimeoutExpired:
+                    # Last resort: SIGKILL (may corrupt the file)
+                    print("⚠️  Force killing FFmpeg (file may be incomplete)")
+                    self.recording_process.kill()
+                    self.recording_process.wait()
 
         except Exception as e:
-            print(f"❌ Error starting recording: {e}")
-            return False
+            print(f"❌ Error stopping recording gracefully: {e}")
+            # Fallback to terminate
+            try:
+                self.recording_process.terminate()
+                self.recording_process.wait(timeout=5)
+            except:
+                self.recording_process.kill()
 
     def stop_recording(self) -> None:
         """Stop recording video"""
         self.recording = False
-        if self.recording_process:
-            self.recording_process.terminate()
-            try:
-                self.recording_process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                self.recording_process.kill()
-            self.recording_process = None
+        self._stop_recording_gracefully()
+        self.recording_process = None
         print("⏹️  Recording stopped")
 
     def start_streaming(self) -> bool:
         """Start streaming video"""
+        # Set streaming to True BEFORE connecting so threads can start
+        self.streaming = True
+
         if not self.connect():
+            self.streaming = False  # Reset on failure
             return False
 
-        self.streaming = True
         return True
 
     def stop_streaming(self) -> None:
@@ -286,7 +367,6 @@ class RTSPStreamer:
             try:
                 import shutil
                 shutil.rmtree(self.temp_dir)
-                print(f"🗑️  Cleaned up temp directory: {self.temp_dir}")
             except Exception as e:
                 print(f"Warning: Could not clean up temp directory: {e}")
 
@@ -309,20 +389,15 @@ class RTSPStreamer:
             frame_data = self.get_frame()
             if frame_data:
                 frame_base64 = base64.b64encode(frame_data).decode('utf-8')
+                # Emit to all connected clients using Flask-SocketIO
                 socketio.emit('video_frame', {'image': frame_base64})
-            else:
-                print("⚠️  No frame data available for web streaming")
         except Exception as e:
             print(f"Error emitting frame: {e}")
 
     def emit_frames_loop(self) -> None:
         """Loop to emit frames to web clients"""
-        emit_count = 0
         while self.streaming:
             self._emit_frame()
-            emit_count += 1
-            if emit_count % 30 == 0:  # Log every 30th emission
-                print(f"📡 Emitted {emit_count} frames to web clients")
             time.sleep(1.0 / self.streaming_config['frame_rate'])
 
 # Global streamer instance
@@ -335,7 +410,7 @@ def index() -> str:
 
 @app.route('/video_feed')
 def video_feed() -> Response:
-    """Video feed for HTTP streaming"""
+    """Video feed for HTTP streaming (backup/alternative to WebSocket)"""
     def generate() -> Iterator[bytes]:
         while True:
             if streamer:
@@ -346,56 +421,6 @@ def video_feed() -> Response:
             time.sleep(0.1)
 
     return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
-
-@app.route('/start_stream', methods=['POST'])
-def start_stream() -> Response:
-    """Start RTSP streaming"""
-    global streamer
-
-    # Get RTSP URL from configuration
-    rtsp_url: str = get_rtsp_url()
-    print(f"🚀 Starting stream with URL: {rtsp_url}")
-
-    if streamer:
-        streamer.stop_streaming()
-
-    streamer = RTSPStreamer(rtsp_url)
-
-    if streamer.start_streaming():
-        # Start frame emission thread
-        streamer.emit_thread = threading.Thread(target=streamer.emit_frames_loop, daemon=True)
-        streamer.emit_thread.start()
-
-        return jsonify({"status": "success", "message": "Stream started successfully"})
-    else:
-        return jsonify({"status": "error", "message": "Failed to start stream. Check camera connection and FFmpeg installation."})
-
-@app.route('/stop_stream', methods=['POST'])
-def stop_stream() -> Response:
-    """Stop RTSP streaming"""
-    global streamer
-
-    if streamer:
-        streamer.stop_streaming()
-        streamer = None
-
-    return jsonify({"status": "success", "message": "Stream stopped"})
-
-@app.route('/start_recording', methods=['POST'])
-def start_recording() -> Response:
-    """Start recording video"""
-    if streamer and streamer.start_recording():
-        return jsonify({"status": "success", "message": "Recording started"})
-    else:
-        return jsonify({"status": "error", "message": "Failed to start recording. Make sure stream is active."})
-
-@app.route('/stop_recording', methods=['POST'])
-def stop_recording() -> Response:
-    """Stop recording video"""
-    if streamer:
-        streamer.stop_recording()
-
-    return jsonify({"status": "success", "message": "Recording stopped"})
 
 @app.route('/status')
 def status() -> Response:
@@ -421,17 +446,100 @@ def handle_connect() -> None:
 def handle_disconnect() -> None:
     print('Client disconnected')
 
+# Global initialization lock to prevent multiple starts
+_initialization_lock = threading.Lock()
+_initialized = False
+
+def initialize_streaming() -> None:
+    """Initialize streaming and recording on startup"""
+    global streamer, _initialized
+
+    with _initialization_lock:
+        # Prevent multiple initializations
+        if _initialized or streamer is not None:
+            print("⚠️  Streaming already initialized, skipping...")
+            return
+
+        _initialized = True
+
+        rtsp_url = get_rtsp_url()
+        print(f"🚀 Starting continuous streaming and recording...")
+        print(f"📹 RTSP URL: {rtsp_url}")
+
+        streamer = RTSPStreamer(rtsp_url)
+
+        if streamer.start_streaming():
+            # Start frame emission using Flask-SocketIO background task
+            socketio.start_background_task(streamer.emit_frames_loop)
+
+            # Start continuous recording
+            if streamer.start_recording():
+                print("✅ Streaming and recording started successfully")
+                print(f"📂 Recordings will be saved to: {streamer.output_dir}")
+                print("📏 Files will auto-rotate at 100MB")
+            else:
+                print("⚠️  Streaming started but recording failed")
+        else:
+            print("❌ Failed to start streaming")
+            _initialized = False  # Reset on failure
+
+_auto_start_scheduled = False
+
+def start_auto_streaming():
+    """Schedule auto-start streaming - call this from server startup"""
+    global _auto_start_scheduled
+
+    if _auto_start_scheduled:
+        print("⚠️  Auto-start already scheduled, skipping...")
+        return
+
+    _auto_start_scheduled = True
+    print("📅 Scheduling auto-start in 2 seconds...")
+
+    def _auto_start_streaming():
+        time.sleep(2)  # Wait for server to fully initialize
+        initialize_streaming()
+
+    socketio.start_background_task(_auto_start_streaming)
+
+def cleanup_on_exit():
+    """Cleanup function called on exit"""
+    global streamer
+    print("\n🛑 Shutting down gracefully...")
+    if streamer:
+        print("⏸️  Stopping streaming and finalizing recordings...")
+        streamer.stop_streaming()
+    print("✅ Cleanup complete")
+
 if __name__ == '__main__':
+    import signal
+    import atexit
+
+    # Register cleanup handler
+    atexit.register(cleanup_on_exit)
+
+    # Handle SIGTERM and SIGINT gracefully
+    def signal_handler(sig, frame):
+        print(f"\n⚠️  Received signal {sig}")
+        cleanup_on_exit()
+        import sys
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+
     try:
         config: Dict[str, Any] = get_app_config()
         print("="*50)
         print("RTSP Camera Streaming Server (FFmpeg)")
+        print("Continuous Streaming & Recording Mode")
         print("="*50)
         print(f"Server starting on: http://{config['host']}:{config['port']}")
-        print(f"RTSP URL: {get_rtsp_url()}")
-        print("\nIMPORTANT: Update config.py with your camera credentials!")
         print("Make sure FFmpeg is installed on your system.")
         print("="*50)
+
+        # Start auto-streaming
+        start_auto_streaming()
 
         socketio.run(
             app,
@@ -440,6 +548,9 @@ if __name__ == '__main__':
             debug=config['debug']
         )
     except KeyboardInterrupt:
-        print("\nShutting down...")
-        if streamer:
-            streamer.stop_streaming()
+        pass  # Handled by signal_handler
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        cleanup_on_exit()
+    finally:
+        print("👋 Server stopped")

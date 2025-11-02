@@ -26,25 +26,16 @@ APP_CONFIG: Dict[str, Any] = {
     'secret_key': 'change_this_secret_key_in_production',
 }
 
-# Try to import private configuration and merge with defaults
-try:
-    from config_private import RTSP_CONFIG_PRIVATE, APP_CONFIG_PRIVATE
-    RTSP_CONFIG.update(RTSP_CONFIG_PRIVATE)
-    APP_CONFIG.update(APP_CONFIG_PRIVATE)
-    print("✅ Loaded private configuration from config_private.py")
-except ImportError:
-    print("ℹ️  No config_private.py found - using default configuration")
-    print("   To use private settings, copy config_private.py.example to config_private.py")
-
 # Video Recording Settings (FFmpeg-based)
 RECORDING_CONFIG: Dict[str, Any] = {
     'output_directory': 'recordings',
     'video_codec': 'libx264',      # FFmpeg video codec for recording
     'audio_codec': 'aac',          # FFmpeg audio codec for recording
-    'preset': 'fast',              # FFmpeg encoding preset (fast, medium, slow)
-    'crf': 23,                     # Constant Rate Factor (18-28, lower = better quality)
+    'preset': 'fast',              # FFmpeg encoding preset (ultrafast, superfast, veryfast, faster, fast, medium, slow)
+    'crf': 23,                     # Constant Rate Factor (18-28, lower = better quality, higher = more compression)
     'default_fps': 30,             # Default FPS if not detected from stream
     'jpeg_quality': 80,            # JPEG quality for web streaming (1-100)
+    'resolution': None,            # Downscale resolution for recordings (e.g., '1280x720'), None = keep original
 }
 
 # Streaming Settings (FFmpeg-based)
@@ -73,3 +64,28 @@ def get_recording_config() -> Dict[str, Any]:
 def get_streaming_config() -> Dict[str, Any]:
     """Get streaming configuration"""
     return STREAMING_CONFIG.copy()
+
+# Try to import private configuration and merge with defaults
+# This must be done AFTER all config dictionaries are defined
+try:
+    from config_private import RTSP_CONFIG_PRIVATE, APP_CONFIG_PRIVATE
+    RTSP_CONFIG.update(RTSP_CONFIG_PRIVATE)
+    APP_CONFIG.update(APP_CONFIG_PRIVATE)
+
+    # Also try to import streaming and recording config overrides
+    try:
+        from config_private import STREAMING_CONFIG_PRIVATE
+        STREAMING_CONFIG.update(STREAMING_CONFIG_PRIVATE)
+    except ImportError:
+        pass
+
+    try:
+        from config_private import RECORDING_CONFIG_PRIVATE
+        RECORDING_CONFIG.update(RECORDING_CONFIG_PRIVATE)
+    except ImportError:
+        pass
+
+    print("✅ Loaded private configuration from config_private.py")
+except ImportError:
+    print("ℹ️  No config_private.py found - using default configuration")
+    print("   To use private settings, copy config_private.py.example to config_private.py")

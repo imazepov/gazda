@@ -272,8 +272,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🎥 RTSP Camera Stream</h1>
-            <p>Real-time video streaming and recording from your Amcrest camera</p>
+            <h1>🎥 RTSP Camera Monitor</h1>
+            <p>Continuous streaming and recording • Auto-rotation at 100MB</p>
         </div>
 
         <div class="main-content">
@@ -282,44 +282,20 @@
                     <canvas id="videoCanvas" style="width: 100%; height: 100%; object-fit: cover; display: none;"></canvas>
                     <img id="videoStream" alt="Video Stream">
                     <div class="video-placeholder" id="videoPlaceholder">
-                        📹 Click "Start Stream" to begin video streaming
+                        📹 Connecting to camera stream...
                     </div>
                 </div>
             </div>
 
             <div class="controls-section">
-                <div class="control-panel">
-                    <h3>Stream Controls</h3>
-                    <div class="button-group">
-                        <button class="btn btn-primary" id="startStreamBtn">
-                            ▶️ Start Stream
-                        </button>
-                        <button class="btn btn-danger" id="stopStreamBtn" disabled>
-                            ⏹️ Stop Stream
-                        </button>
-                    </div>
-                </div>
-
-                <div class="control-panel">
-                    <h3>Recording Controls</h3>
-                    <div class="button-group">
-                        <button class="btn btn-primary" id="startRecordingBtn" disabled>
-                            🔴 Start Recording
-                        </button>
-                        <button class="btn btn-danger" id="stopRecordingBtn" disabled>
-                            ⏸️ Stop Recording
-                        </button>
-                    </div>
-                </div>
-
                 <div class="status-panel">
-                    <h3>Status</h3>
+                    <h3>System Status</h3>
                     <div class="status-item">
-                        <span class="status-label">Connection:</span>
+                        <span class="status-label">Camera Connection:</span>
                         <span class="status-value status-disconnected" id="connectionStatus">Disconnected</span>
                     </div>
                     <div class="status-item">
-                        <span class="status-label">Streaming:</span>
+                        <span class="status-label">Video Streaming:</span>
                         <span class="status-value status-inactive" id="streamingStatus">Inactive</span>
                     </div>
                     <div class="status-item">
@@ -327,10 +303,24 @@
                         <span class="status-value status-inactive" id="recordingStatus">Inactive</span>
                     </div>
                 </div>
+
+                <div class="status-panel">
+                    <h3>Information</h3>
+                    <div class="status-item">
+                        <span class="status-label">Mode:</span>
+                        <span class="status-value" style="background: #dbeafe; color: #1e40af;">Continuous</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">File Rotation:</span>
+                        <span class="status-value" style="background: #dbeafe; color: #1e40af;">100 MB</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Auto-Start:</span>
+                        <span class="status-value" style="background: #dcfce7; color: #166534;">Enabled</span>
+                    </div>
+                </div>
             </div>
         </div>
-
-        <div class="message" id="messageDiv"></div>
     </div>
 
     <script>
@@ -338,14 +328,9 @@
         const socket = io();
 
         // Get DOM elements
-        const startStreamBtn = document.getElementById('startStreamBtn');
-        const stopStreamBtn = document.getElementById('stopStreamBtn');
-        const startRecordingBtn = document.getElementById('startRecordingBtn');
-        const stopRecordingBtn = document.getElementById('stopRecordingBtn');
         const videoCanvas = document.getElementById('videoCanvas');
         const videoStream = document.getElementById('videoStream');
         const videoPlaceholder = document.getElementById('videoPlaceholder');
-        const messageDiv = document.getElementById('messageDiv');
 
         // Status elements
         const connectionStatus = document.getElementById('connectionStatus');
@@ -356,12 +341,12 @@
 
         // Socket event handlers
         socket.on('connect', function() {
-            console.log('Connected to server');
+            console.log('WebSocket connected');
             updateStatus();
         });
 
         socket.on('disconnect', function() {
-            console.log('Disconnected from server');
+            console.log('WebSocket disconnected');
             updateStatus();
         });
 
@@ -379,88 +364,6 @@
             img.src = 'data:image/jpeg;base64,' + data.image;
         });
 
-        // Button event handlers
-        startStreamBtn.addEventListener('click', async () => {
-            setButtonLoading(startStreamBtn, true);
-            try {
-                const response = await fetch('/start_stream', { method: 'POST' });
-                const data = await response.json();
-                showMessage(data.message, data.status === 'success' ? 'success' : 'error');
-                updateStatus();
-            } catch (error) {
-                showMessage('Error starting stream: ' + error.message, 'error');
-            } finally {
-                setButtonLoading(startStreamBtn, false);
-            }
-        });
-
-        stopStreamBtn.addEventListener('click', async () => {
-            setButtonLoading(stopStreamBtn, true);
-            try {
-                const response = await fetch('/stop_stream', { method: 'POST' });
-                const data = await response.json();
-                showMessage(data.message, 'success');
-
-                // Hide video and show placeholder
-                videoCanvas.style.display = 'none';
-                videoPlaceholder.style.display = 'flex';
-                videoPlaceholder.textContent = '📹 Stream stopped. Click "Start Stream" to resume.';
-
-                updateStatus();
-            } catch (error) {
-                showMessage('Error stopping stream: ' + error.message, 'error');
-            } finally {
-                setButtonLoading(stopStreamBtn, false);
-            }
-        });
-
-        startRecordingBtn.addEventListener('click', async () => {
-            setButtonLoading(startRecordingBtn, true);
-            try {
-                const response = await fetch('/start_recording', { method: 'POST' });
-                const data = await response.json();
-                showMessage(data.message, data.status === 'success' ? 'success' : 'error');
-                updateStatus();
-            } catch (error) {
-                showMessage('Error starting recording: ' + error.message, 'error');
-            } finally {
-                setButtonLoading(startRecordingBtn, false);
-            }
-        });
-
-        stopRecordingBtn.addEventListener('click', async () => {
-            setButtonLoading(stopRecordingBtn, true);
-            try {
-                const response = await fetch('/stop_recording', { method: 'POST' });
-                const data = await response.json();
-                showMessage(data.message, 'success');
-                updateStatus();
-            } catch (error) {
-                showMessage('Error stopping recording: ' + error.message, 'error');
-            } finally {
-                setButtonLoading(stopRecordingBtn, false);
-            }
-        });
-
-        // Utility functions
-        function setButtonLoading(button, loading) {
-            if (loading) {
-                button.innerHTML = '<div class="loading"></div>' + button.textContent;
-                button.disabled = true;
-            } else {
-                button.innerHTML = button.textContent.replace(/^.*?(\w)/, '$1');
-            }
-        }
-
-        function showMessage(message, type) {
-            messageDiv.textContent = message;
-            messageDiv.className = `message ${type} show`;
-
-            setTimeout(() => {
-                messageDiv.classList.remove('show');
-            }, 5000);
-        }
-
         async function updateStatus() {
             try {
                 const response = await fetch('/status');
@@ -475,14 +378,8 @@
                 streamingStatus.className = `status-value ${status.streaming ? 'status-active' : 'status-inactive'}`;
 
                 // Update recording status
-                recordingStatus.textContent = status.recording ? 'Recording' : 'Inactive';
+                recordingStatus.textContent = status.recording ? 'Active' : 'Inactive';
                 recordingStatus.className = `status-value ${status.recording ? 'status-active' : 'status-inactive'}`;
-
-                // Update button states
-                startStreamBtn.disabled = status.streaming;
-                stopStreamBtn.disabled = !status.streaming;
-                startRecordingBtn.disabled = !status.streaming || status.recording;
-                stopRecordingBtn.disabled = !status.recording;
 
             } catch (error) {
                 console.error('Error updating status:', error);

@@ -438,6 +438,108 @@ def status() -> Response:
             "connected": False
         })
 
+@app.route('/recordings')
+def recordings_page() -> str:
+    """Recordings browser page"""
+    return render_template('recordings.html')
+
+@app.route('/api/recordings')
+def list_recordings() -> Response:
+    """List all recordings with metadata"""
+    from config import get_recording_config
+    import re
+    from datetime import datetime as dt
+
+    recording_config = get_recording_config()
+    recordings_dir = recording_config['output_directory']
+
+    if not os.path.exists(recordings_dir):
+        return jsonify([])
+
+    recordings = []
+    pattern = re.compile(r'recording_(\d{8})_(\d{6})\.mp4')
+
+    for filename in os.listdir(recordings_dir):
+        if not filename.endswith('.mp4'):
+            continue
+
+        filepath = os.path.join(recordings_dir, filename)
+
+        # Parse timestamp from filename
+        match = pattern.match(filename)
+        if match:
+            date_str = match.group(1)  # YYYYMMDD
+            time_str = match.group(2)  # HHMMSS
+            timestamp = dt.strptime(f"{date_str}_{time_str}", "%Y%m%d_%H%M%S")
+        else:
+            # Fallback to file modification time
+            timestamp = dt.fromtimestamp(os.path.getmtime(filepath))
+
+        # Get file info
+        file_size = os.path.getsize(filepath)
+
+        # Try to get video duration using ffmpeg.probe
+        duration = None
+        try:
+            probe = ffmpeg.probe(filepath)
+            duration = float(probe['format']['duration'])
+        except:
+            pass
+
+        recordings.append({
+            'filename': filename,
+            'timestamp': timestamp.isoformat(),
+            'date': timestamp.strftime('%Y-%m-%d'),
+            'time': timestamp.strftime('%H:%M:%S'),
+            'size': file_size,
+            'size_mb': round(file_size / (1024 * 1024), 2),
+            'duration': duration,
+            'duration_formatted': f"{int(duration // 60)}:{int(duration % 60):02d}" if duration else None
+        })
+
+    # Sort by timestamp, newest first
+    recordings.sort(key=lambda x: x['timestamp'], reverse=True)
+
+    return jsonify(recordings)
+
+@app.route('/api/recordings/<filename>')
+def serve_recording(filename: str) -> Response:
+    """Serve a recording file"""
+    from config import get_recording_config
+    from flask import send_from_directory
+
+    recording_config = get_recording_config()
+    recordings_dir = recording_config['output_directory']
+
+    # Security: prevent directory traversal
+    if '..' in filename or '/' in filename:
+        return jsonify({"error": "Invalid filename"}), 400
+
+    return send_from_directory(recordings_dir, filename)
+
+@app.route('/api/recordings/<filename>', methods=['DELETE'])
+def delete_recording(filename: str) -> Response:
+    """Delete a recording file"""
+    from config import get_recording_config
+
+    recording_config = get_recording_config()
+    recordings_dir = recording_config['output_directory']
+
+    # Security: prevent directory traversal
+    if '..' in filename or '/' in filename:
+        return jsonify({"error": "Invalid filename"}), 400
+
+    filepath = os.path.join(recordings_dir, filename)
+
+    if not os.path.exists(filepath):
+        return jsonify({"error": "File not found"}), 404
+
+    try:
+        os.remove(filepath)
+        return jsonify({"success": True, "message": f"Deleted {filename}"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @socketio.on('connect')
 def handle_connect() -> None:
     print('Client connected')

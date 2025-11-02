@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recordings - RTSP Camera</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            padding: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 2em;
+            font-weight: 300;
+        }
+
+        .header a {
+            color: white;
+            text-decoration: none;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px 20px;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .header a:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            gap: 20px;
+        }
+
+        .search-box {
+            flex: 1;
+            max-width: 400px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 12px 20px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: #4f46e5;
+        }
+
+        .stats {
+            display: flex;
+            gap: 20px;
+            color: #64748b;
+            font-size: 0.9em;
+        }
+
+        .stats span {
+            padding: 8px 16px;
+            background: #f1f5f9;
+            border-radius: 6px;
+        }
+
+        .recordings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .recording-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .recording-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+            border-color: #4f46e5;
+        }
+
+        .recording-thumbnail {
+            width: 100%;
+            aspect-ratio: 16/9;
+            background: #000;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .recording-thumbnail video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .recording-thumbnail .play-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            pointer-events: none;
+        }
+
+        .recording-info {
+            padding: 15px;
+        }
+
+        .recording-date {
+            font-size: 0.9em;
+            color: #64748b;
+            margin-bottom: 5px;
+        }
+
+        .recording-time {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 10px;
+        }
+
+        .recording-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85em;
+            color: #64748b;
+        }
+
+        .recording-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.3s;
+            flex: 1;
+        }
+
+        .btn-primary {
+            background: #4f46e5;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #4338ca;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            max-width: 90%;
+            max-height: 90%;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 10;
+            transition: background 0.3s;
+        }
+
+        .modal-close:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .modal video {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #64748b;
+        }
+
+        .empty-state h2 {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #64748b;
+        }
+
+        .date-group {
+            margin-bottom: 30px;
+        }
+
+        .date-header {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📹 Recordings</h1>
+            <a href="/">← Back to Live View</a>
+        </div>
+
+        <div class="content">
+            <div class="toolbar">
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="Search recordings...">
+                </div>
+                <div class="stats">
+                    <span id="totalCount">0 recordings</span>
+                    <span id="totalSize">0 MB</span>
+                </div>
+            </div>
+
+            <div id="recordingsList" class="loading">
+                Loading recordings...
+            </div>
+        </div>
+    </div>
+
+    <div id="videoModal" class="modal">
+        <button class="modal-close" onclick="closeModal()">×</button>
+        <div class="modal-content">
+            <video id="modalVideo" controls autoplay></video>
+        </div>
+    </div>
+
+    <script>
+        let recordings = [];
+        let filteredRecordings = [];
+
+        async function loadRecordings() {
+            try {
+                const response = await fetch('/api/recordings');
+                recordings = await response.json();
+                filteredRecordings = recordings;
+                renderRecordings();
+            } catch (error) {
+                console.error('Error loading recordings:', error);
+                document.getElementById('recordingsList').innerHTML =
+                    '<div class="empty-state"><h2>Error loading recordings</h2></div>';
+            }
+        }
+
+        function renderRecordings() {
+            const container = document.getElementById('recordingsList');
+
+            if (filteredRecordings.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h2>No recordings found</h2>
+                        <p>Recordings will appear here once the camera starts recording.</p>
+                    </div>
+                `;
+                updateStats();
+                return;
+            }
+
+            // Group by date
+            const byDate = {};
+            filteredRecordings.forEach(rec => {
+                if (!byDate[rec.date]) {
+                    byDate[rec.date] = [];
+                }
+                byDate[rec.date].push(rec);
+            });
+
+            let html = '';
+            Object.keys(byDate).sort().reverse().forEach(date => {
+                const dateObj = new Date(date);
+                const dateFormatted = dateObj.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+
+                html += `
+                    <div class="date-group">
+                        <div class="date-header">${dateFormatted}</div>
+                        <div class="recordings-grid">
+                `;
+
+                byDate[date].forEach(rec => {
+                    html += `
+                        <div class="recording-card" onclick="playRecording('${rec.filename}')">
+                            <div class="recording-thumbnail">
+                                <div class="play-icon">▶</div>
+                            </div>
+                            <div class="recording-info">
+                                <div class="recording-date">${rec.date}</div>
+                                <div class="recording-time">${rec.time}</div>
+                                <div class="recording-meta">
+                                    <span>${rec.size_mb} MB</span>
+                                    <span>${rec.duration_formatted || 'Unknown'}</span>
+                                </div>
+                                <div class="recording-actions">
+                                    <button class="btn btn-primary" onclick="event.stopPropagation(); downloadRecording('${rec.filename}')">
+                                        Download
+                                    </button>
+                                    <button class="btn btn-danger" onclick="event.stopPropagation(); deleteRecording('${rec.filename}')">
+                                        Delete
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += `
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+            updateStats();
+        }
+
+        function updateStats() {
+            const totalCount = filteredRecordings.length;
+            const totalSize = filteredRecordings.reduce((sum, rec) => sum + rec.size_mb, 0);
+
+            document.getElementById('totalCount').textContent =
+                `${totalCount} recording${totalCount !== 1 ? 's' : ''}`;
+            document.getElementById('totalSize').textContent =
+                `${totalSize.toFixed(2)} MB`;
+        }
+
+        function playRecording(filename) {
+            const modal = document.getElementById('videoModal');
+            const video = document.getElementById('modalVideo');
+            video.src = `/api/recordings/${filename}`;
+            modal.classList.add('active');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('videoModal');
+            const video = document.getElementById('modalVideo');
+            video.pause();
+            video.src = '';
+            modal.classList.remove('active');
+        }
+
+        function downloadRecording(filename) {
+            window.location.href = `/api/recordings/${filename}`;
+        }
+
+        async function deleteRecording(filename) {
+            if (!confirm(`Are you sure you want to delete ${filename}?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/recordings/${filename}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    await loadRecordings();
+                } else {
+                    alert('Failed to delete recording');
+                }
+            } catch (error) {
+                console.error('Error deleting recording:', error);
+                alert('Error deleting recording');
+            }
+        }
+
+        // Search functionality
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            filteredRecordings = recordings.filter(rec =>
+                rec.filename.toLowerCase().includes(query) ||
+                rec.date.includes(query) ||
+                rec.time.includes(query)
+            );
+            renderRecordings();
+        });
+
+        // Close modal on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+
+        // Close modal on background click
+        document.getElementById('videoModal').addEventListener('click', (e) => {
+            if (e.target.id === 'videoModal') {
+                closeModal();
+            }
+        });
+
+        // Load recordings on page load
+        loadRecordings();
+    </script>
+</body>
+</html>

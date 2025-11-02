@@ -226,12 +226,14 @@
         }
 
         .modal-content {
-            max-width: 90%;
-            max-height: 90%;
+            max-width: 90vw;
+            max-height: 90vh;
             background: #000;
             border-radius: 12px;
-            overflow: hidden;
             position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .modal-close {
@@ -255,9 +257,12 @@
         }
 
         .modal video {
+            max-width: 90vw;
+            max-height: 90vh;
             width: 100%;
             height: auto;
             display: block;
+            border-radius: 12px;
         }
 
         .empty-state {

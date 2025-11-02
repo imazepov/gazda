@@ -6,20 +6,50 @@ import json
 import tempfile
 import glob
 from datetime import datetime
-from flask import Flask, render_template, Response, jsonify
+from flask import Flask, render_template, Response, jsonify, request
 from flask_socketio import SocketIO, emit
+from flask_httpauth import HTTPBasicAuth
 import base64
 import numpy as np
 from io import BytesIO
 from PIL import Image
 import ffmpeg
-from config import get_rtsp_url, get_app_config, get_recording_config, get_streaming_config
+from config import get_rtsp_url, get_app_config, get_recording_config, get_streaming_config, get_auth_config
 from typing import Dict, Any, Optional, Iterator, Tuple, Union
 
 app: Flask = Flask(__name__)
 app_config: Dict[str, Any] = get_app_config()
 app.config['SECRET_KEY'] = app_config['secret_key']
 socketio: SocketIO = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+
+# HTTP Basic Authentication setup
+auth: HTTPBasicAuth = HTTPBasicAuth()
+auth_config: Dict[str, Any] = get_auth_config()
+
+@auth.verify_password
+def verify_password(username: str, password: str) -> Optional[str]:
+    """Verify username and password for HTTP Basic Auth"""
+    if not auth_config.get('enabled', True):
+        return username  # Auth disabled, allow all
+
+    if username == auth_config['username'] and password == auth_config['password']:
+        return username
+    return None
+
+@app.before_request
+def require_authentication() -> Optional[Response]:
+    """Require authentication for all routes"""
+    if not auth_config.get('enabled', True):
+        return None  # Auth disabled, allow all
+
+    # Allow WebSocket connections (they'll be authenticated via the initial HTTP handshake)
+    if request.path.startswith('/socket.io/'):
+        return None
+
+    # Check authentication
+    auth_result = auth.current_user()
+    if auth_result is None:
+        return auth.auth_error_callback()
 
 class RTSPStreamer:
     def __init__(self, rtsp_url: str, recording_config: Optional[Dict[str, Any]] = None, streaming_config: Optional[Dict[str, Any]] = None) -> None:

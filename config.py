@@ -26,6 +26,13 @@ APP_CONFIG: Dict[str, Any] = {
     'secret_key': 'change_this_secret_key_in_production',
 }
 
+# HTTP Basic Authentication Settings - DEFAULT VALUES
+AUTH_CONFIG: Dict[str, Any] = {
+    'enabled': True,                # Enable/disable authentication
+    'username': 'admin',            # Default username
+    'password': 'changeme',         # Default password - CHANGE THIS!
+}
+
 # Video Recording Settings (FFmpeg-based)
 RECORDING_CONFIG: Dict[str, Any] = {
     'output_directory': 'recordings',
@@ -66,6 +73,10 @@ def get_streaming_config() -> Dict[str, Any]:
     """Get streaming configuration"""
     return STREAMING_CONFIG.copy()
 
+def get_auth_config() -> Dict[str, Any]:
+    """Get authentication configuration"""
+    return AUTH_CONFIG.copy()
+
 # Try to import private configuration and merge with defaults
 # This must be done AFTER all config dictionaries are defined
 try:
@@ -83,6 +94,12 @@ try:
     try:
         from config_private import RECORDING_CONFIG_PRIVATE
         RECORDING_CONFIG.update(RECORDING_CONFIG_PRIVATE)
+    except ImportError:
+        pass
+
+    try:
+        from config_private import AUTH_CONFIG_PRIVATE
+        AUTH_CONFIG.update(AUTH_CONFIG_PRIVATE)
     except ImportError:
         pass
 

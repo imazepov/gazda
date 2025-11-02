@@ -28,6 +28,12 @@ A Python-based web application for streaming video from RTSP cameras (specifical
 - Adjustable video quality and streaming parameters
 - FFmpeg-specific configuration options
 
+🔐 **Security Features**
+- HTTP Basic Authentication for web interface
+- Private configuration file support (gitignored)
+- Configurable authentication settings
+- Easy to enable/disable authentication
+
 ## Screenshots
 
 ### Web Interface
@@ -238,6 +244,42 @@ APP_CONFIG = {
 }
 ```
 
+### HTTP Authentication Settings
+
+The application includes HTTP Basic Authentication to protect access:
+
+```python
+AUTH_CONFIG = {
+    'enabled': True,        # Enable/disable authentication
+    'username': 'admin',    # Default username
+    'password': 'changeme', # Default password - CHANGE THIS!
+}
+```
+
+**Security Recommendations:**
+- ⚠️ **Always change the default password** in production
+- 🔒 Store credentials in `config_private.py` (not tracked in git)
+- 🛡️ Use HTTPS in production to encrypt credentials in transit
+- 🔑 Use strong, unique passwords for authentication
+
+To use private authentication settings, create `config_private.py`:
+
+```python
+AUTH_CONFIG_PRIVATE = {
+    'enabled': True,
+    'username': 'your_username',
+    'password': 'your_secure_password',
+}
+```
+
+To disable authentication (not recommended for production):
+
+```python
+AUTH_CONFIG_PRIVATE = {
+    'enabled': False,
+}
+```
+
 ### Recording Settings (FFmpeg-based)
 
 ```python
@@ -420,10 +462,12 @@ rtsp-camera-streaming/
 
 ## Security Considerations
 
-- Change default passwords and secret keys in production
-- Consider using HTTPS for web interface
-- Restrict network access to camera and application
-- Regularly update dependencies
+- 🔐 **HTTP Basic Authentication** - Built-in authentication protects web interface access
+- 🔑 **Change Default Credentials** - Always update default passwords and secret keys in production
+- 🔒 **Use HTTPS** - Deploy behind a reverse proxy with SSL/TLS for encrypted connections
+- 📁 **Private Configuration** - Store sensitive credentials in `config_private.py` (gitignored)
+- 🌐 **Network Access** - Restrict network access to camera and application
+- 🔄 **Regular Updates** - Keep dependencies up to date for security patches
 
 ## Contributing
 

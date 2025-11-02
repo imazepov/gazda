@@ -27,3 +27,10 @@ APP_CONFIG_PRIVATE: Dict[str, Any] = {
 #     'resolution': None,  # Downscale: '1280x720', '640x480', or None for original
 #     'max_file_size_mb': 10,  # Max file size before rotation (default: 10 MB)
 # }
+
+# HTTP Basic Authentication settings (optional)
+# AUTH_CONFIG_PRIVATE: Dict[str, Any] = {
+#     'enabled': True,  # Set to False to disable authentication
+#     'username': 'your_username',
+#     'password': 'your_secure_password',
+# }

@@ -20,11 +20,13 @@ from typing import Dict, Any, Optional, Iterator, Tuple, Union
 app: Flask = Flask(__name__)
 app_config: Dict[str, Any] = get_app_config()
 app.config['SECRET_KEY'] = app_config['secret_key']
-socketio: SocketIO = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+socketio: SocketIO = SocketIO(
+    app, cors_allowed_origins="*", async_mode='threading')
 
 # HTTP Basic Authentication setup
 auth: HTTPBasicAuth = HTTPBasicAuth()
 auth_config: Dict[str, Any] = get_auth_config()
+
 
 @auth.verify_password
 def verify_password(username: str, password: str) -> Optional[str]:
@@ -36,6 +38,7 @@ def verify_password(username: str, password: str) -> Optional[str]:
         return username
     return None
 
+
 @app.before_request
 def require_authentication() -> Optional[Response]:
     """Require authentication for all routes"""
@@ -46,10 +49,43 @@ def require_authentication() -> Optional[Response]:
     if request.path.startswith('/socket.io/'):
         return None
 
-    # Check authentication
-    auth_result = auth.current_user()
+    # Extract credentials from Authorization header
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith('Basic '):
+        # No auth provided, return 401 with WWW-Authenticate header to trigger browser dialog
+        return Response(
+            'Authentication required',
+            401,
+            {'WWW-Authenticate': 'Basic realm="Login Required"'}
+        )
+
+    # Decode Basic Auth credentials
+    try:
+        encoded_credentials = auth_header.split(' ')[1]
+        decoded_credentials = base64.b64decode(
+            encoded_credentials).decode('utf-8')
+        username, password = decoded_credentials.split(':', 1)
+    except (IndexError, ValueError, UnicodeDecodeError):
+        # Invalid auth header format
+        return Response(
+            'Invalid authentication format',
+            401,
+            {'WWW-Authenticate': 'Basic realm="Login Required"'}
+        )
+
+    # Verify credentials using our verify_password function
+    auth_result = verify_password(username, password)
     if auth_result is None:
-        return auth.auth_error_callback(401)
+        # Invalid credentials - return 401 to trigger dialog again
+        return Response(
+            'Invalid credentials',
+            401,
+            {'WWW-Authenticate': 'Basic realm="Login Required"'}
+        )
+
+    # Authentication successful
+    return None
+
 
 class RTSPStreamer:
     def __init__(self, rtsp_url: str, recording_config: Optional[Dict[str, Any]] = None, streaming_config: Optional[Dict[str, Any]] = None) -> None:
@@ -76,7 +112,8 @@ class RTSPStreamer:
     def check_ffmpeg_installed(self) -> bool:
         """Check if FFmpeg is installed on the system"""
         try:
-            subprocess.run(['ffmpeg', '-version'], capture_output=True, check=True)
+            subprocess.run(['ffmpeg', '-version'],
+                           capture_output=True, check=True)
             return True
         except (subprocess.CalledProcessError, FileNotFoundError):
             return False
@@ -86,7 +123,8 @@ class RTSPStreamer:
         try:
             probe = ffmpeg.probe(self.rtsp_url)
             if probe and 'streams' in probe:
-                video_stream = next((s for s in probe['streams'] if s['codec_type'] == 'video'), None)
+                video_stream = next(
+                    (s for s in probe['streams'] if s['codec_type'] == 'video'), None)
                 if video_stream:
                     return {
                         'width': int(video_stream.get('width', 640)),
@@ -113,11 +151,13 @@ class RTSPStreamer:
             # Get stream information
             stream_info = self.get_stream_info()
             if stream_info:
-                print(f"📺 Stream info: {stream_info['width']}x{stream_info['height']} @ {stream_info['fps']} FPS")
+                print(
+                    f"📺 Stream info: {stream_info['width']}x{stream_info['height']} @ {stream_info['fps']} FPS")
                 self.stream_info = stream_info
             else:
                 print("⚠️  Could not get stream info, using defaults")
-                self.stream_info = {'width': 640, 'height': 480, 'fps': 30, 'codec': 'h264'}
+                self.stream_info = {'width': 640,
+                                    'height': 480, 'fps': 30, 'codec': 'h264'}
 
             # Start FFmpeg process for frame extraction
             self.start_ffmpeg_process()
@@ -153,11 +193,13 @@ class RTSPStreamer:
             )
 
             # Start frame reading thread
-            self.frame_thread = threading.Thread(target=self._read_frames, daemon=True)
+            self.frame_thread = threading.Thread(
+                target=self._read_frames, daemon=True)
             self.frame_thread.start()
 
             # Start stderr monitoring thread
-            self.stderr_thread = threading.Thread(target=self._monitor_stderr, daemon=True)
+            self.stderr_thread = threading.Thread(
+                target=self._monitor_stderr, daemon=True)
             self.stderr_thread.start()
 
             print("✅ FFmpeg process started successfully")
@@ -187,7 +229,8 @@ class RTSPStreamer:
         while self.streaming and self.ffmpeg_process and self.ffmpeg_process.poll() is None:
             try:
                 # Look for new frame files
-                frame_files = glob.glob(os.path.join(self.temp_dir, "frame_*.jpg"))
+                frame_files = glob.glob(
+                    os.path.join(self.temp_dir, "frame_*.jpg"))
                 frame_files.sort()
 
                 if frame_files:
@@ -195,7 +238,8 @@ class RTSPStreamer:
                     latest_frame = frame_files[-1]
 
                     # Extract frame number from filename
-                    frame_number = int(latest_frame.split("_")[-1].split(".")[0])
+                    frame_number = int(
+                        latest_frame.split("_")[-1].split(".")[0])
 
                     if frame_number > last_frame_number:
                         # Wait a moment to ensure file is fully written
@@ -235,7 +279,8 @@ class RTSPStreamer:
 
         self.recording = True
         # Start recording loop in background thread
-        self.recording_thread = threading.Thread(target=self._recording_loop, daemon=True)
+        self.recording_thread = threading.Thread(
+            target=self._recording_loop, daemon=True)
         self.recording_thread.start()
         return True
 
@@ -249,7 +294,8 @@ class RTSPStreamer:
             try:
                 # Create output filename with timestamp
                 timestamp: str = datetime.now().strftime("%Y%m%d_%H%M%S")
-                output_path: str = os.path.join(self.output_dir, f"recording_{timestamp}.mp4")
+                output_path: str = os.path.join(
+                    self.output_dir, f"recording_{timestamp}.mp4")
 
                 # Build FFmpeg command with compression settings
                 cmd = [
@@ -267,7 +313,8 @@ class RTSPStreamer:
 
                 # Add resolution scaling if configured
                 if self.recording_config.get('resolution'):
-                    cmd.extend(['-vf', f"scale={self.recording_config['resolution']}"])
+                    cmd.extend(
+                        ['-vf', f"scale={self.recording_config['resolution']}"])
 
                 # Audio encoding
                 cmd.extend([
@@ -292,7 +339,8 @@ class RTSPStreamer:
                 while self.recording and self.streaming:
                     if self.recording_process.poll() is not None:
                         # Process ended unexpectedly - log error
-                        stderr_output = self.recording_process.stderr.read().decode('utf-8', errors='ignore')
+                        stderr_output = self.recording_process.stderr.read().decode('utf-8',
+                                                                                    errors='ignore')
                         print(f"❌ Recording process ended unexpectedly")
                         if stderr_output:
                             # Only show last few lines of error
@@ -308,7 +356,8 @@ class RTSPStreamer:
                     if os.path.exists(output_path):
                         file_size = os.path.getsize(output_path)
                         if file_size >= MAX_FILE_SIZE:
-                            print(f"📏 File reached {file_size / (1024*1024):.1f}MB, rotating...")
+                            print(
+                                f"📏 File reached {file_size / (1024*1024):.1f}MB, rotating...")
                             # Gracefully stop this recording to start a new file
                             self._stop_recording_gracefully()
                             break
@@ -432,13 +481,16 @@ class RTSPStreamer:
             self._emit_frame()
             time.sleep(1.0 / self.streaming_config['frame_rate'])
 
+
 # Global streamer instance
 streamer: Optional[RTSPStreamer] = None
+
 
 @app.route('/')
 def index() -> str:
     """Main page"""
     return render_template('index.html')
+
 
 @app.route('/video_feed')
 def video_feed() -> Response:
@@ -453,6 +505,7 @@ def video_feed() -> Response:
             time.sleep(0.1)
 
     return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
 
 @app.route('/status')
 def status() -> Response:
@@ -472,10 +525,12 @@ def status() -> Response:
             "max_file_size_mb": 10
         })
 
+
 @app.route('/recordings')
 def recordings_page() -> str:
     """Recordings browser page"""
     return render_template('recordings.html')
+
 
 @app.route('/api/recordings')
 def list_recordings() -> Response:
@@ -536,6 +591,7 @@ def list_recordings() -> Response:
 
     return jsonify(recordings)
 
+
 @app.route('/api/recordings/<filename>')
 def serve_recording(filename: str) -> Response:
     """Serve a recording file"""
@@ -550,6 +606,7 @@ def serve_recording(filename: str) -> Response:
         return jsonify({"error": "Invalid filename"}), 400
 
     return send_from_directory(recordings_dir, filename)
+
 
 @app.route('/api/recordings/<filename>', methods=['DELETE'])
 def delete_recording(filename: str) -> Response:
@@ -574,17 +631,21 @@ def delete_recording(filename: str) -> Response:
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
 @socketio.on('connect')
 def handle_connect() -> None:
     print('Client connected')
+
 
 @socketio.on('disconnect')
 def handle_disconnect() -> None:
     print('Client disconnected')
 
+
 # Global initialization lock to prevent multiple starts
 _initialization_lock = threading.Lock()
 _initialized = False
+
 
 def initialize_streaming() -> None:
     """Initialize streaming and recording on startup"""
@@ -610,7 +671,8 @@ def initialize_streaming() -> None:
 
             # Start continuous recording
             if streamer.start_recording():
-                max_size = streamer.recording_config.get('max_file_size_mb', 10)
+                max_size = streamer.recording_config.get(
+                    'max_file_size_mb', 10)
                 print("✅ Streaming and recording started successfully")
                 print(f"📂 Recordings will be saved to: {streamer.output_dir}")
                 print(f"📏 Files will auto-rotate at {max_size}MB")
@@ -620,7 +682,9 @@ def initialize_streaming() -> None:
             print("❌ Failed to start streaming")
             _initialized = False  # Reset on failure
 
+
 _auto_start_scheduled = False
+
 
 def start_auto_streaming():
     """Schedule auto-start streaming - call this from server startup"""
@@ -639,6 +703,7 @@ def start_auto_streaming():
 
     socketio.start_background_task(_auto_start_streaming)
 
+
 def cleanup_on_exit():
     """Cleanup function called on exit"""
     global streamer
@@ -647,6 +712,7 @@ def cleanup_on_exit():
         print("⏸️  Stopping streaming and finalizing recordings...")
         streamer.stop_streaming()
     print("✅ Cleanup complete")
+
 
 if __name__ == '__main__':
     import signal

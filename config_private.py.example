@@ -19,3 +19,11 @@ APP_CONFIG_PRIVATE: Dict[str, Any] = {
     # 'debug': False,
     # 'port': 5005,
 }
+
+# Recording settings override (optional)
+# RECORDING_CONFIG_PRIVATE: Dict[str, Any] = {
+#     'crf': 28,  # Compression level: 18=high quality, 28=medium, 35=low quality
+#     'preset': 'faster',  # Encoding speed: ultrafast, faster, fast, medium, slow
+#     'resolution': None,  # Downscale: '1280x720', '640x480', or None for original
+#     'max_file_size_mb': 10,  # Max file size before rotation (default: 10 MB)
+# }

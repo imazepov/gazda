@@ -211,7 +211,9 @@ class RTSPStreamer:
 
     def _recording_loop(self) -> None:
         """Continuous recording loop with file rotation based on size"""
-        MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB in bytes
+        # Get max file size from config (in MB) and convert to bytes
+        max_file_size_mb = self.recording_config.get('max_file_size_mb', 10)
+        MAX_FILE_SIZE = max_file_size_mb * 1024 * 1024
 
         while self.recording and self.streaming:
             try:
@@ -429,13 +431,15 @@ def status() -> Response:
         return jsonify({
             "streaming": streamer.streaming,
             "recording": streamer.recording,
-            "connected": streamer.ffmpeg_process is not None and streamer.ffmpeg_process.poll() is None
+            "connected": streamer.ffmpeg_process is not None and streamer.ffmpeg_process.poll() is None,
+            "max_file_size_mb": streamer.recording_config.get('max_file_size_mb', 10)
         })
     else:
         return jsonify({
             "streaming": False,
             "recording": False,
-            "connected": False
+            "connected": False,
+            "max_file_size_mb": 10
         })
 
 @app.route('/recordings')
@@ -576,9 +580,10 @@ def initialize_streaming() -> None:
 
             # Start continuous recording
             if streamer.start_recording():
+                max_size = streamer.recording_config.get('max_file_size_mb', 10)
                 print("✅ Streaming and recording started successfully")
                 print(f"📂 Recordings will be saved to: {streamer.output_dir}")
-                print("📏 Files will auto-rotate at 100MB")
+                print(f"📏 Files will auto-rotate at {max_size}MB")
             else:
                 print("⚠️  Streaming started but recording failed")
         else:

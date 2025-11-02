@@ -281,7 +281,7 @@
         <div class="header">
             <div>
                 <h1>🎥 RTSP Camera Monitor</h1>
-                <p>Continuous streaming and recording • Auto-rotation at 100MB</p>
+                <p>Continuous streaming and recording • Auto-rotation at <span id="maxFileSize">10</span>MB</p>
             </div>
             <a href="/recordings" style="color: white; text-decoration: none; background: rgba(255, 255, 255, 0.2); padding: 10px 20px; border-radius: 8px; transition: all 0.3s;">
                 📹 View Recordings
@@ -324,7 +324,7 @@
                     </div>
                     <div class="status-item">
                         <span class="status-label">File Rotation:</span>
-                        <span class="status-value" style="background: #dbeafe; color: #1e40af;">100 MB</span>
+                        <span class="status-value" style="background: #dbeafe; color: #1e40af;"><span id="maxFileSizeInfo">10</span> MB</span>
                     </div>
                     <div class="status-item">
                         <span class="status-label">Auto-Start:</span>
@@ -392,6 +392,15 @@
                 // Update recording status
                 recordingStatus.textContent = status.recording ? 'Active' : 'Inactive';
                 recordingStatus.className = `status-value ${status.recording ? 'status-active' : 'status-inactive'}`;
+
+                // Update max file size if available
+                if (status.max_file_size_mb) {
+                    document.getElementById('maxFileSize').textContent = status.max_file_size_mb;
+                    const infoElement = document.getElementById('maxFileSizeInfo');
+                    if (infoElement) {
+                        infoElement.textContent = status.max_file_size_mb;
+                    }
+                }
 
             } catch (error) {
                 console.error('Error updating status:', error);

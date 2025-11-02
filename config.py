@@ -36,6 +36,7 @@ RECORDING_CONFIG: Dict[str, Any] = {
     'default_fps': 30,             # Default FPS if not detected from stream
     'jpeg_quality': 80,            # JPEG quality for web streaming (1-100)
     'resolution': None,            # Downscale resolution for recordings (e.g., '1280x720'), None = keep original
+    'max_file_size_mb': 10,        # Maximum file size in MB before rotation (default: 10 MB)
 }
 
 # Streaming Settings (FFmpeg-based)

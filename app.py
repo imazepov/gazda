@@ -105,6 +105,13 @@ class RTSPStreamer:
         self.last_frame_time: float = 0
         self.temp_dir: Optional[str] = None
 
+        # Monitoring statistics
+        self.frames_received: int = 0
+        self.frames_emitted: int = 0
+        self.last_stats_report: float = time.time()
+        self.ffmpeg_restart_count: int = 0
+        self.last_frame_warning_time: float = 0
+
         # Create output directory if it doesn't exist
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
@@ -202,6 +209,11 @@ class RTSPStreamer:
                 target=self._monitor_stderr, daemon=True)
             self.stderr_thread.start()
 
+            # Start health monitoring thread
+            self.monitor_thread = threading.Thread(
+                target=self._monitor_health, daemon=True)
+            self.monitor_thread.start()
+
             print("✅ FFmpeg process started successfully")
 
         except Exception as e:
@@ -255,6 +267,7 @@ class RTSPStreamer:
                                 self.frame_buffer = frame_data
                                 self.frame_ready.set()
                                 self.last_frame_time = time.time()
+                                self.frames_received += 1
 
                             last_frame_number = frame_number
 
@@ -271,6 +284,63 @@ class RTSPStreamer:
             except Exception as e:
                 print(f"Error reading frame: {e}")
                 time.sleep(0.1)
+
+    def _monitor_health(self) -> None:
+        """Monitor stream health, detect crashes, and report stats"""
+        FRAME_TIMEOUT = 30  # Warn if no frames for 30 seconds
+        STATS_INTERVAL = 60  # Report stats every 60 seconds
+
+        while self.streaming:
+            try:
+                current_time = time.time()
+
+                # Check for frame timeout
+                if self.last_frame_time > 0:
+                    time_since_last_frame = current_time - self.last_frame_time
+
+                    if time_since_last_frame > FRAME_TIMEOUT:
+                        # Only warn once every 60 seconds to avoid log spam
+                        if current_time - self.last_frame_warning_time > 60:
+                            print(f"⚠️  WARNING: No frames received for {int(time_since_last_frame)} seconds")
+                            self.last_frame_warning_time = current_time
+
+                # Check if FFmpeg process has crashed
+                if self.ffmpeg_process and self.ffmpeg_process.poll() is not None:
+                    print(f"❌ FFmpeg process crashed (exit code: {self.ffmpeg_process.returncode})")
+                    print(f"🔄 Attempting to restart FFmpeg... (restart #{self.ffmpeg_restart_count + 1})")
+
+                    self.ffmpeg_restart_count += 1
+
+                    # Try to restart FFmpeg
+                    try:
+                        self.start_ffmpeg_process()
+                        print("✅ FFmpeg process restarted successfully")
+                    except Exception as e:
+                        print(f"❌ Failed to restart FFmpeg: {e}")
+                        print(f"⏸️  Will retry in 10 seconds...")
+                        time.sleep(10)
+
+                # Report stats periodically
+                if current_time - self.last_stats_report > STATS_INTERVAL:
+                    uptime = current_time - self.last_stats_report
+                    fps_received = self.frames_received / uptime if uptime > 0 else 0
+                    fps_emitted = self.frames_emitted / uptime if uptime > 0 else 0
+
+                    print(f"📊 Stats (last {int(uptime)}s): "
+                          f"Received: {self.frames_received} frames ({fps_received:.1f} FPS), "
+                          f"Emitted: {self.frames_emitted} frames ({fps_emitted:.1f} FPS), "
+                          f"FFmpeg restarts: {self.ffmpeg_restart_count}")
+
+                    # Reset counters for next interval
+                    self.frames_received = 0
+                    self.frames_emitted = 0
+                    self.last_stats_report = current_time
+
+                time.sleep(5)  # Check every 5 seconds
+
+            except Exception as e:
+                print(f"Error in health monitor: {e}")
+                time.sleep(5)
 
     def start_recording(self) -> bool:
         """Start continuous recording with automatic file rotation"""
@@ -472,6 +542,7 @@ class RTSPStreamer:
                 frame_base64 = base64.b64encode(frame_data).decode('utf-8')
                 # Emit to all connected clients using Flask-SocketIO
                 socketio.emit('video_frame', {'image': frame_base64})
+                self.frames_emitted += 1
         except Exception as e:
             print(f"Error emitting frame: {e}")
 

@@ -186,6 +186,12 @@ class RTSPStreamer:
             cmd = [
                 'ffmpeg',
                 '-rtsp_transport', 'tcp',  # Use TCP instead of UDP for more reliable connection
+                '-timeout', '5000000',  # 5 second timeout for connection (in microseconds)
+                '-stimeout', '5000000',  # 5 second timeout for socket operations
+                '-rw_timeout', '10000000',  # 10 second timeout for read/write operations
+                '-reconnect', '1',  # Enable automatic reconnection
+                '-reconnect_streamed', '1',  # Reconnect for streamed input
+                '-reconnect_delay_max', '5',  # Max delay between reconnect attempts (seconds)
                 '-i', self.rtsp_url,
                 '-f', 'image2',
                 '-vf', f'fps={fps}',  # Extract frames at configured FPS
@@ -288,6 +294,7 @@ class RTSPStreamer:
     def _monitor_health(self) -> None:
         """Monitor stream health, detect crashes, and report stats"""
         FRAME_TIMEOUT = 30  # Warn if no frames for 30 seconds
+        FRAME_TIMEOUT_RESTART = 60  # Restart FFmpeg if no frames for 60 seconds
         STATS_INTERVAL = 60  # Report stats every 60 seconds
 
         while self.streaming:
@@ -304,8 +311,38 @@ class RTSPStreamer:
                             print(f"⚠️  WARNING: No frames received for {int(time_since_last_frame)} seconds")
                             self.last_frame_warning_time = current_time
 
-                # Check if FFmpeg process has crashed
-                if self.ffmpeg_process and self.ffmpeg_process.poll() is not None:
+                    # If FFmpeg is stuck (running but not producing frames), restart it
+                    if time_since_last_frame > FRAME_TIMEOUT_RESTART:
+                        if self.ffmpeg_process and self.ffmpeg_process.poll() is None:
+                            print(f"💀 FFmpeg stuck (running but no frames for {int(time_since_last_frame)}s)")
+                            print(f"🔄 Killing and restarting FFmpeg... (restart #{self.ffmpeg_restart_count + 1})")
+
+                            # Force kill the stuck process
+                            try:
+                                self.ffmpeg_process.terminate()
+                                time.sleep(2)
+                                if self.ffmpeg_process.poll() is None:
+                                    self.ffmpeg_process.kill()
+                            except Exception as e:
+                                print(f"Error killing FFmpeg: {e}")
+
+                            self.ffmpeg_restart_count += 1
+
+                            # Try to restart FFmpeg
+                            try:
+                                time.sleep(2)  # Brief pause before restart
+                                self.start_ffmpeg_process()
+                                print("✅ FFmpeg process restarted successfully")
+                                # Reset frame time tracking
+                                self.last_frame_time = 0
+                                self.last_frame_warning_time = 0
+                            except Exception as e:
+                                print(f"❌ Failed to restart FFmpeg: {e}")
+                                print(f"⏸️  Will retry in 10 seconds...")
+                                time.sleep(10)
+
+                # Check if FFmpeg process has crashed (exited)
+                elif self.ffmpeg_process and self.ffmpeg_process.poll() is not None:
                     print(f"❌ FFmpeg process crashed (exit code: {self.ffmpeg_process.returncode})")
                     print(f"🔄 Attempting to restart FFmpeg... (restart #{self.ffmpeg_restart_count + 1})")
 
@@ -313,6 +350,7 @@ class RTSPStreamer:
 
                     # Try to restart FFmpeg
                     try:
+                        time.sleep(2)  # Brief pause before restart
                         self.start_ffmpeg_process()
                         print("✅ FFmpeg process restarted successfully")
                     except Exception as e:
@@ -371,6 +409,12 @@ class RTSPStreamer:
                 cmd = [
                     'ffmpeg',
                     '-rtsp_transport', 'tcp',
+                    '-timeout', '5000000',  # 5 second timeout for connection (in microseconds)
+                    '-stimeout', '5000000',  # 5 second timeout for socket operations
+                    '-rw_timeout', '10000000',  # 10 second timeout for read/write operations
+                    '-reconnect', '1',  # Enable automatic reconnection
+                    '-reconnect_streamed', '1',  # Reconnect for streamed input
+                    '-reconnect_delay_max', '5',  # Max delay between reconnect attempts (seconds)
                     '-i', self.rtsp_url,
                 ]
 

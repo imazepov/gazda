@@ -186,12 +186,11 @@ class RTSPStreamer:
             cmd = [
                 'ffmpeg',
                 '-rtsp_transport', 'tcp',  # Use TCP instead of UDP for more reliable connection
-                '-timeout', '5000000',  # 5 second timeout for connection (in microseconds)
-                '-stimeout', '5000000',  # 5 second timeout for socket operations
-                '-rw_timeout', '10000000',  # 10 second timeout for read/write operations
+                '-timeout', '5000000',  # 5 second timeout for socket I/O (in microseconds)
+                '-rw_timeout', '10000000',  # 10 second timeout for read/write operations (in microseconds)
                 '-reconnect', '1',  # Enable automatic reconnection
                 '-reconnect_streamed', '1',  # Reconnect for streamed input
-                '-reconnect_delay_max', '5',  # Max delay between reconnect attempts (seconds)
+                '-reconnect_delay_max', '5',  # Max 5 seconds delay between reconnect attempts
                 '-i', self.rtsp_url,
                 '-f', 'image2',
                 '-vf', f'fps={fps}',  # Extract frames at configured FPS
@@ -409,12 +408,11 @@ class RTSPStreamer:
                 cmd = [
                     'ffmpeg',
                     '-rtsp_transport', 'tcp',
-                    '-timeout', '5000000',  # 5 second timeout for connection (in microseconds)
-                    '-stimeout', '5000000',  # 5 second timeout for socket operations
-                    '-rw_timeout', '10000000',  # 10 second timeout for read/write operations
+                    '-timeout', '5000000',  # 5 second timeout for socket I/O (in microseconds)
+                    '-rw_timeout', '10000000',  # 10 second timeout for read/write operations (in microseconds)
                     '-reconnect', '1',  # Enable automatic reconnection
                     '-reconnect_streamed', '1',  # Reconnect for streamed input
-                    '-reconnect_delay_max', '5',  # Max delay between reconnect attempts (seconds)
+                    '-reconnect_delay_max', '5',  # Max 5 seconds delay between reconnect attempts
                     '-i', self.rtsp_url,
                 ]
 

@@ -186,11 +186,7 @@ class RTSPStreamer:
             cmd = [
                 'ffmpeg',
                 '-rtsp_transport', 'tcp',  # Use TCP instead of UDP for more reliable connection
-                '-timeout', '5000000',  # 5 second timeout for socket I/O (in microseconds)
-                '-rw_timeout', '10000000',  # 10 second timeout for read/write operations (in microseconds)
-                '-reconnect', '1',  # Enable automatic reconnection
-                '-reconnect_streamed', '1',  # Reconnect for streamed input
-                '-reconnect_delay_max', '5',  # Max 5 seconds delay between reconnect attempts
+                '-rtsp_flags', 'prefer_tcp',  # Prefer TCP for RTP
                 '-i', self.rtsp_url,
                 '-f', 'image2',
                 '-vf', f'fps={fps}',  # Extract frames at configured FPS
@@ -407,12 +403,8 @@ class RTSPStreamer:
                 # Build FFmpeg command with compression settings
                 cmd = [
                     'ffmpeg',
-                    '-rtsp_transport', 'tcp',
-                    '-timeout', '5000000',  # 5 second timeout for socket I/O (in microseconds)
-                    '-rw_timeout', '10000000',  # 10 second timeout for read/write operations (in microseconds)
-                    '-reconnect', '1',  # Enable automatic reconnection
-                    '-reconnect_streamed', '1',  # Reconnect for streamed input
-                    '-reconnect_delay_max', '5',  # Max 5 seconds delay between reconnect attempts
+                    '-rtsp_transport', 'tcp',  # Use TCP for RTSP transport
+                    '-rtsp_flags', 'prefer_tcp',  # Prefer TCP for RTP
                     '-i', self.rtsp_url,
                 ]
 
